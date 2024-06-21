@@ -3,25 +3,42 @@ console.log("Just to prove script is working")
 // {type: "updateMouth", size: 1, message: "string"} // Open
 // {type: "updateMouth", size: 0, message: "string"} // Closed
 
+var url = 'ws://localhost:8001/api'
+
+let ws
+
 function showMessage(message) {
     window.setTimeout(() => window.alert(message), 50);
 }
 
-function receiveMoves(board, websocket) {
-    websocket.addEventListener("message", ({ data}) => {
-        const event = JSON.parse(data);
-        switch (event.type) {
-            case "updateMouth":
-                // Update Dabi.
-                updateImage(event.size)
-                break;
-            case "error":
-                showMessage(event.message);
+function connect(){    
+    ws = new WebSocket('ws://localhost:8001');
+
+    ws.onopen = () => {
+    console.log('WebSocket connection opened');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Received data:', data);
+        switch (data.type) {
+            case 'updateMouth':
+                setFrame(data.size);
+                console.log(data.message)
                 break;
             default:
-                throw new Error(`Unsupported event type: ${event.type}.`);
+                showMessage(`There is no ${data.type} prepared.`)
         }
-    });
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket connection closed. Attempting to reconnect in 1 second...');
+        setTimeout(connect, 1000); // Attempt to reconnect after 1 second
+    };
 }
 
 
@@ -31,7 +48,6 @@ function setFrame(frame) {
     resetFrames();
 
     document.querySelectorAll('img')[frame - 1].style.display = 'block';
-
 }
 
 function resetFrames() {
@@ -41,3 +57,4 @@ function resetFrames() {
 }
 
 setFrame(1);
+connect();
