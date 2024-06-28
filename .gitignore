@@ -1,6 +1,9 @@
 # Specific files
 tester.py
 
+# Unwanted file types
+*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
