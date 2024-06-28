@@ -1,15 +1,11 @@
 from dotenv import load_dotenv
 import asyncio
-import websockets
-import json
-import time
-
-load_dotenv()
-
-# Websocket Server
+import random
 
 async def main():
-    print("main")
+    num = random.random()
+    num *= 17
+    print(num)
     
 if __name__ == "__main__":
     asyncio.run(main())

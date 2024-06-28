@@ -4,11 +4,10 @@ import asyncio
 import json
 import websockets
 import re
+import sqlite3
 
 from twitch_connector import TwitchBot
 from bot_openai import OpenAI_Bot
-
-import random
 
 OPEN_MOUTH = {
     "type": "updateMouth",
@@ -36,7 +35,24 @@ DABI_VOICE = None # If I decide to give Dabi a real voice later.
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = TwitchBot()
-
+    
+async def db_insert(table_name, username, message, response):
+    # Connect to the db. If it doesn't exist it will be created.
+    db_name = 'dabibraincell.db'
+    conn = sqlite3.connect(db_name)
+    cur = conn.cursor()
+    table_columns = 'id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, message TEXT NOT NULL, response TEXT NOT NULL'
+    create_table_query = f'CREATE TABLE IF NOT EXISTS {table_name} ({table_columns})'
+    cur.execute(create_table_query)
+    
+    # Insert the entry
+    insert_query = f'INSERT INTO {table_name} (username, message, response) VALUES (?, ?, ?)'
+    cur.execute(insert_query, (username, message, response))
+    
+    # Commit and close
+    conn.commit()
+    conn.close()
+    
 # For when dabi is the cohost
 # Only responds to channel point redemptions.
 # This can only be added after twitch_connector has added the ability to listen to channel point redemptions.
@@ -50,6 +66,9 @@ async def cohost_chatter():
 async def chat_chatter():
     global twitch_bot
     twitch_msg = twitch_bot.listen_for_msg() # Will pull EVERY SINGLE MESSAGE
+    
+    print("======")
+    print(twitch_msg)
     formatted_msg = None
     
     # Regex time!
@@ -61,13 +80,14 @@ async def chat_chatter():
         msg_server = matches.group(2)
         msg_msg = matches.group(3)
         formatted_msg = f"{msg_username}: {msg_msg} in channel {msg_server}"
-        print(formatted_msg)
-        
-        # Save to DB here
-        
+        print(formatted_msg, flush=True)
+              
     if formatted_msg != None:
         response = await dabi.send_msg(formatted_msg)
+        # response = f"Dabi responded to: {formatted_msg}"
         print(response)
+        await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
+        
     # return response
 
 async def generate_messages():
