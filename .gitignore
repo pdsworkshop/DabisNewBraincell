@@ -3,6 +3,7 @@ tester.py
 
 # Unwanted file types
 *.txt
+*.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
