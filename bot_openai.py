@@ -16,6 +16,9 @@ import time
 import math
 import requests
 import base64
+from dotenv import load_dotenv
+
+load_dotenv()
 
 TEXT_DIR = "./"
 TTS_DIR = "./outputs/"
@@ -218,7 +221,6 @@ class OpenAI_Bot():
         sample_rate=24000 
 
         output_directory = TTS_DIR
-
         os.makedirs(output_directory, exist_ok=True)
 
         file_name = os.path.join(output_directory, name)
@@ -260,9 +262,8 @@ class OpenAI_Bot():
         output_name = os.path.splitext(os.path.basename(path_to_mp3ify))[0]
         opus_file_path = os.path.join(output_dir, f"{output_name}.opus")
         opus_file = opus_file_path
-
-        wav_file.export(opus_file, format="opus", parameters=["-ar", str(wav_file.frame_rate)])
         
+        wav_file.export(opus_file, format="opus", parameters=["-ar", str(wav_file.frame_rate)])
         opus_duration = wav_file.duration_seconds
         
         return opus_file_path, opus_duration

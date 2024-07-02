@@ -6,7 +6,7 @@ import websockets
 import re
 import sqlite3
 
-from twitch_connector import TwitchBot
+from twitch_connector import ChatBot
 from bot_openai import OpenAI_Bot
 
 OPEN_MOUTH = {
@@ -34,8 +34,8 @@ You are the absolute picture of perfection. Everyone should be like you. In fact
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
-twitch_bot = TwitchBot()
-    
+twitch_bot = ChatBot()
+
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
     db_name = 'dabibraincell.db'
@@ -65,23 +65,25 @@ async def cohost_chatter():
 # For now: Listen to every message. Later: When there is a LOT of messages, collect 3-5 at a time and only respond to randomly 1 of them.
 async def chat_chatter():
     global twitch_bot
-    twitch_msg = twitch_bot.listen_for_msg() # Will pull EVERY SINGLE MESSAGE
-    
-    print("======")
-    print(twitch_msg)
+    twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
     formatted_msg = None
+    print(twitch_msg)
     
-    # Regex time!
-    pattern = r":(.*?)!.*?@.*? PRIVMSG #(.*?) :(.*)"
-    matches = re.search(pattern, twitch_msg)
+    if twitch_msg == None:
+        return
+    
+    if twitch_msg["message"].find(":robot:") > -1 or twitch_msg["message"].find(":streamelements:") > -1:
+        twitch_msg["message"] = 'PING'
+        print("Found a bot message!")
+    
     # All done!
-    if matches:
-        msg_username = matches.group(1)
-        msg_server = matches.group(2)
-        msg_msg = matches.group(3)
-        formatted_msg = f"{msg_username}: {msg_msg} in channel {msg_server}"
+    if twitch_msg["message"].find('PING') < 0:
+        msg_username = twitch_msg["display_name"]
+        msg_server = twitch_msg["channel"]
+        msg_msg = twitch_msg["message"]
+        formatted_msg = f"{msg_username}: {msg_msg}"
         print(formatted_msg, flush=True)
-              
+
     if formatted_msg != None:
         response = await dabi.send_msg(formatted_msg)
         # response = f"Dabi responded to: {formatted_msg}"
@@ -94,14 +96,6 @@ async def generate_messages():
     # Generator that yields messages to be send over the WebSocket.
     # Will generate multiple messages adding them to a queue.
     # In send_msg is "async for" which pulls one at a time whatever is next.
-
-    # while True:
-    #     await asyncio.sleep(1)
-    #     roll = random.random()
-    #     if roll < 0.5:
-    #         yield json.dumps(OPEN_MOUTH)
-    #     else:
-    #         yield json.dumps(CLOSE_MOUTH)
     await chat_chatter()
     yield json.dumps(CLOSE_MOUTH)
     
@@ -113,14 +107,15 @@ async def send_msg(websocket):
         print("Connection closed")
 
 async def main():
-    # twitch_bot = TwitchBot()
-    # print("started?")
-    # while True:
-    #     resp = twitch_bot.listen_for_msg()
-    #     print(resp)
+    global twitch_bot
+    
+    bot_task = asyncio.create_task(twitch_bot.handler())
     
     async with websockets.serve(send_msg, "", 8001):
-        await asyncio.Future()  # run forever
+        await bot_task
+    
+    # await asyncio.gather(bot_task, websocket_task)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
