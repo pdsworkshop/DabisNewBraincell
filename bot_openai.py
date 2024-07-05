@@ -16,6 +16,8 @@ import time
 import math
 import requests
 import base64
+import requests
+import urllib.parse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -202,6 +204,33 @@ class OpenAI_Bot():
         duration = p.get_length() / 1000
         time.sleep(duration)
 
+    def create_se_voice(self, voice, text):
+        se_filename = "_se" + str(hash(text)) + ".mp3"
+        normalised_dir = normalise_dir(TTS_DIR)
+        msg_file_path = os.path.join(normalised_dir, se_filename)
+        base_url = "https://api.streamelements.com/kappa/v2/speech"    
+        params = {
+            'voice': voice,
+            'text': text
+        }    
+        encoded_params = urllib.parse.urlencode(params)
+        full_url = f"{base_url}?{encoded_params}"    
+        response = requests.get(full_url)
+        
+        if response.status_code == 200:
+            with open(msg_file_path, "wb") as f:
+                f.write(response.content)
+            print(f"MP3 saved as {msg_file_path}")
+            
+            audio = AudioSegment.from_mp3(msg_file_path)
+            duration_ms = len(audio)
+            duration_sec = duration_ms / 1000.0
+            
+            return msg_file_path, duration_sec
+        else: 
+            print(f"Failed code {response.status_code}")
+            print(f"Response: {response.text}")
+
     # Allows you to choose which audio channel to output to using device_id
     def read_message_choose_device(self, msg_file_path, device_id):
         sample_rate, data = wavfile.read(msg_file_path)
@@ -386,27 +415,33 @@ async def testing_main():
     # print(response)
 
     ### Single message TTT version
-    msg_to_test = "Do you like beatsaber?"
-    response = await test_bot.send_msg(msg_to_test)
-    print(response)
-    test_bot.chat_history.pop()
-    test_bot.chat_history.pop()
-    print("==============================================================")
-    response = await test_bot.send_msg(msg_to_test)
-    print(response)
-    test_bot.chat_history.pop()
-    test_bot.chat_history.pop()
-    print("==============================================================")
-    response = await test_bot.send_msg(msg_to_test)
-    print(response)
-    test_bot.chat_history.pop()
-    test_bot.chat_history.pop()
-    print("==============================================================")
-    response = await test_bot.send_msg(msg_to_test)
-    print(response)
-    test_bot.chat_history.pop()
-    test_bot.chat_history.pop()
-    print("==============================================================")
+    # msg_to_test = "Do you like beatsaber?"
+    # response = await test_bot.send_msg(msg_to_test)
+    # print(response)
+    # test_bot.chat_history.pop()
+    # test_bot.chat_history.pop()
+    # print("==============================================================")
+    # response = await test_bot.send_msg(msg_to_test)
+    # print(response)
+    # test_bot.chat_history.pop()
+    # test_bot.chat_history.pop()
+    # print("==============================================================")
+    # response = await test_bot.send_msg(msg_to_test)
+    # print(response)
+    # test_bot.chat_history.pop()
+    # test_bot.chat_history.pop()
+    # print("==============================================================")
+    # response = await test_bot.send_msg(msg_to_test)
+    # print(response)
+    # test_bot.chat_history.pop()
+    # test_bot.chat_history.pop()
+    # print("==============================================================")
+
+    se_path, se_duration = test_bot.create_se_voice("Brian", "This is a test?")
+    await asyncio.sleep(1)
+    test_bot.read_message(se_path)
+    await asyncio.sleep(se_duration)
+    print("Test complete")
 
 if __name__ == "__main__":
     asyncio.run(testing_main())
