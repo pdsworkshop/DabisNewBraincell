@@ -3,8 +3,10 @@
 import asyncio
 import json
 import websockets
-import re
 import sqlite3
+import os
+
+import random 
 
 from twitch_connector import ChatBot
 from bot_openai import OpenAI_Bot
@@ -67,10 +69,12 @@ async def chat_chatter():
     global twitch_bot
     twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
     formatted_msg = None
-    print(twitch_msg)
+    response = None
     
     if twitch_msg == None:
         return
+    
+    print(twitch_msg)
     
     if twitch_msg["message"].find(":robot:") > -1 or twitch_msg["message"].find(":streamelements:") > -1:
         twitch_msg["message"] = 'PING'
@@ -82,7 +86,6 @@ async def chat_chatter():
         msg_server = twitch_msg["channel"]
         msg_msg = twitch_msg["message"]
         formatted_msg = f"{msg_username}: {msg_msg}"
-        print(formatted_msg, flush=True)
 
     if formatted_msg != None:
         response = await dabi.send_msg(formatted_msg)
@@ -90,18 +93,41 @@ async def chat_chatter():
         print(response)
         await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
         
+    if response != None:
+        return response
     # return response
 
 async def generate_messages():
     # Generator that yields messages to be send over the WebSocket.
     # Will generate multiple messages adding them to a queue.
-    # In send_msg is "async for" which pulls one at a time whatever is next.
-    await chat_chatter()
-    yield json.dumps(CLOSE_MOUTH)
+    # In send_msg is "async for" which pulls one at a t.ime whatever is next.
+    global dabi
     
+    response = await chat_chatter()
+    print(f"{response=}")
+    if response == None:
+        yield json.dumps(CLOSE_MOUTH)
+        return
+    to_send = OPEN_MOUTH
+    to_send["message"] = response
+    
+    # Audio making
+    voice_path, voice_duration = dabi.create_se_voice("Brian", response)
+    dabi.read_message(voice_path)
+    await asyncio.sleep(voice_duration)
+    
+    if os.path.exists(voice_path):
+        os.remove(voice_path)
+        await asyncio.sleep(1)
+    else:
+        print(f"Something went wrong with {voice_path}")
+    
+    yield json.dumps(to_send)
+        
 async def send_msg(websocket):
     try:
         async for message in generate_messages():
+            print(f"{message=}")
             await websocket.send(message)
     except websockets.ConnectionClosed:
         print("Connection closed")
