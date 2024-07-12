@@ -16,7 +16,10 @@ class ChatBot:
         self.regex_pattern = re.compile(pattern)
         
     async def on_twitch_message(self, ws, message):
-        print("message is: " + message)
+            
+        # Highest priority, PING/PONG should occur before anything else.
+        if "PING" in message:
+            await ws.send("PONG")
 
         if "PRIVMSG" in message:
             message_data = {}
@@ -29,11 +32,7 @@ class ChatBot:
             message_data["channel"] = groups[1]
             message_data["message"] = groups[2].rstrip("\r\n")
                 
-            print(message_data)
             self.messages.append(message_data)
-            
-        if "PING" in message:
-            await ws.send("PONG")
 
     async def handle_twitch_messages(self, ws):
         async for message in ws:
@@ -43,16 +42,22 @@ class ChatBot:
         # Currently just returning a random message
         # We want to later choose the best one
         # TODO: If the best one can't be found then choose random
+        num = None
         to_send = None
-        if len(self.messages) == 0:
-            return to_send
-        else:
-            num = random.randint(0, len(self.messages))
-            print(self.messages)
-            to_send = self.messages[num]
-            print(f"{num} was chosen out of {len(self.messages)}")
-            self.messages = []
-            return to_send
+        try:
+            if len(self.messages) == 0:
+                return to_send
+            else:
+                num = random.randint(0, len(self.messages))
+                to_send = self.messages[num]
+                self.messages.pop(num)
+                if len(self.messages) > 5:
+                    self.messages = []
+                return to_send
+        except Exception as exception:
+            print(f"{exception}")
+            print(f"{self.messages=}")
+            print(f"{num=}")
 
     async def on_error(self, ws, error):
         print(error)

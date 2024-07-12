@@ -27,8 +27,10 @@ function connect(){
                 console.log(data.message)
                 break;
             default:
-                showMessage(`There is no ${data.type} prepared.`)
+                console.log(`There is no ${data.type} prepared.`)
         }
+        ws.send(200);
+        return false;
     };
 
     ws.onerror = (error) => {

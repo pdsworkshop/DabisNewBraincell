@@ -108,6 +108,7 @@ class OpenAI_Bot():
         self.wink_flag = False
         self.last_emote = "f1"
         self.gtts_voice = "en"
+        self.se_voice = "Brian"
 
         self.start_datetime = datetime.datetime.now()
         path = normalise_dir(TEXT_DIR)
@@ -120,6 +121,7 @@ class OpenAI_Bot():
         temp_system_message = {}
         temp_system_message["role"] = "system"
         temp_system_message["content"] = system_message
+        self.temp_system_message = temp_system_message
 
         self.chat_history.append(temp_system_message)
         self.total_tokens = 0
@@ -176,6 +178,11 @@ class OpenAI_Bot():
 
         return response.choices[0].message.content
     
+    def reset_memory(self):
+        self.chat_history = []
+        self.chat_history.append(self.temp_system_message)
+        self.total_tokens = 0
+    
     # Create a generic TTS using gTTS
     # This is a robotic female voice saved in opus format
     def create_voice(self, msg):
@@ -204,6 +211,7 @@ class OpenAI_Bot():
         duration = p.get_length() / 1000
         time.sleep(duration)
 
+    # Create a voice using StreamElements
     def create_se_voice(self, voice, text):
         se_filename = "_se" + str(hash(text)) + ".mp3"
         normalised_dir = normalise_dir(TTS_DIR)
