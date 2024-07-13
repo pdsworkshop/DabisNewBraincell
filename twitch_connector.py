@@ -97,12 +97,11 @@ class ChatBot:
         print("### connected to Twitch IRC API ###")
 
     async def forward_message(self, dabibody_ws):
-        while True:
-            to_send = await self.twitch_give_best()
-            if to_send:
-                print(f"Forwarding message: {to_send=}")
-                await dabibody_ws.send(json.dumps(to_send))
-            await asyncio.sleep(1)
+        to_send = await self.twitch_give_best()
+        if to_send:
+            print(f"Forwarding message: {to_send=}")
+            await dabibody_ws.send(json.dumps(to_send))
+        await asyncio.sleep(1)
 
     async def handler(self):
         # Make connection to Twitch
