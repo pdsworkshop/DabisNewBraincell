@@ -84,88 +84,37 @@ async def cohost_chatter():
     pass
 
 # For when dabi is the star of the show
-# Listening to Twitch Chat, every message, and responding to it.
-# For now: Listen to every message. Later: When there is a LOT of messages, collect 3-5 at a time and only respond to randomly 1 of them.
-async def chat_chatter():
-    global twitch_bot
+# Takes in the message received from twitch_connector
+# Removes "twitch:" and "speaks" the message
+async def speak_message(message):
     global dabi
-    twitch_msg = None
-    formatted_msg = None
-    response = None
+    global talking
+    to_send = None
+    print("speak message hit")
+    # Twitch section:
+    print(f"{message=}")
+    twitch_prefix = "twitch:"
+    if message["formatted_msg"].startswith(twitch_prefix):
+        send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
+        
+    # Youtube section (IF we ever do it):
     
-    print("Started cchater")
+    response = await dabi.send_msg(send_to_dabi)
+    print(f"{response=}")
+    await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
-    # await asyncio.sleep(2)
+    voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
+    dabi.read_message(voice_path)
+    await asyncio.sleep(voice_duration)
     
-    while True:
-        await asyncio.sleep(0.5)
-        print("Trueing!!")
-        twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
-        print("Twitch message?")
-        print(f"{twitch_msg=}")
-        if twitch_msg == None:
-            continue
-        
-        print(twitch_msg)
-        
-        if twitch_msg["message"][0] == "!":
-            # Only pdgeorge can mindwipe the Dab.
-            if twitch_msg["message"].find("reset") and twitch_msg["user_id"].find("54654420"):
-                print(dabi.chat_history)
-                dabi.reset_memory()
-                print(dabi.chat_history)
-                twitch_msg["message"] = 'PING'
-        
-        if twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@":
-            twitch_msg["message"] = 'PING'
-            print("Found a bot message!")
-        
-        # All done!
-        if twitch_msg["message"].find('PING') < 0:
-            msg_username = twitch_msg["display_name"]
-            msg_server = twitch_msg["channel"]
-            msg_msg = twitch_msg["message"]
-            formatted_msg = f"{msg_username}: {msg_msg}"
-
-        if formatted_msg != None:
-            response = await dabi.send_msg(formatted_msg)
-            print(response)
-            await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
-            
-        
-        # Audio making
-        voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
-            # dabi.analyse audio here.
-            
-            # Analyse the voice/audio here
-            
-            ############################################
-            ##### Websocket stuff will be done here ####
-            ############################################
-        
-        to_send = TEMPLATE
-        to_send["duration"] = voice_duration
-        to_send["message"] = response
-        
-        # Send from "chat_chatter" to "main websocket server?"
-        websocket = create_connection("ws://127.0.0.1:8001", timeout=3)
-        websocket.send(to_send)
-        response_back = websocket.recv()
-        print(f"{response_back=}")
-        websocket.close()
-        
-        dabi.read_message(voice_path) # 'read' the audio
-        await asyncio.sleep(voice_duration + TIME_BEWEEN_SPEAKS)
-        
-        if os.path.exists(voice_path):
-            os.remove(voice_path)
-            await asyncio.sleep(1)
-        else:
-            print(f"Something went wrong with {voice_path}")
+    print("Done speaking")
+    
+    # Need to add in "template" and how it wil be sent in to_send below
+    return to_send
 
 async def generate_messages():
     pass
-        
+
 async def send_msg(websocket):    
     global dabi
     global last_sent
@@ -174,11 +123,14 @@ async def send_msg(websocket):
         
     async for message in websocket:
         CLIENTS.add(websocket)
+        
         counter += 1
         print(f"{counter=}")
         try:
-            to_send = message
-            print(f"{to_send=}")
+            message = json.loads(message)
+            print(f"app 130{message=}")
+            to_send = await speak_message(message)
+            print(f"app 181 {to_send=}")
             
             websockets.broadcast(websockets=CLIENTS, message=to_send)
             

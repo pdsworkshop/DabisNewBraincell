@@ -16,7 +16,6 @@ function connect(){
 
     ws.onopen = () => {
         console.log('WebSocket connection opened');
-        ws.send('{"message": "Hello"}');
     };
 
     ws.onmessage = (event) => {

@@ -29,6 +29,24 @@ class ChatBot:
             
         return twitch_msg
     
+    async def format_twitch_msg(self, twitch_msg):
+        formatted_msg = None
+        
+        if twitch_msg["message"].find("PING") < 0:
+            msg_username = twitch_msg["display_name"]
+            msg_server = twitch_msg["channel"]
+            msg_msg = twitch_msg["message"]
+            formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+            
+            formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+            
+            return formatted_return
+    
     async def on_twitch_message(self, ws, message, dabibody_ws):
             
         # Highest priority, PING/PONG should occur before anything else.
@@ -46,7 +64,12 @@ class ChatBot:
             message_data["channel"] = groups[1]
             message_data["message"] = groups[2].rstrip("\r\n")
                 
-            print(message_data)
+            print(f"{message_data=}")
+            message_data = await self.convert_to_ping(message_data)
+            print(f"{message_data=}")
+            message_data = await self.format_twitch_msg(message_data)
+            print(f"{message_data=}")
+            
             self.messages.append(message_data)
             
             await self.forward_message(dabibody_ws)
@@ -65,17 +88,20 @@ class ChatBot:
         num = None
         to_send = None
         print("Called")
-        print(f"======================{self.messages=}====================")
+        print(f"tc 91 {self.messages=}")
         try:
             if len(self.messages) == 0:
+                print(f"tc 94 {len(self.messages)}")
                 return to_send
             else:
-                num = random.randint(0, len(self.messages))
+                print("Ok, we're at 97")
+                num = random.randint(0, len(self.messages)-1)
                 to_send = self.messages[num]
-                # self.messages.pop(num)
+                print(f"tc 100 {to_send=}")
+                self.messages.pop(num)
                 if len(self.messages) > 5:
                     print("over 5?")
-                    # self.messages = []
+                    self.messages = []
                 return to_send
         except Exception as exception:
             print(f"{exception}")
@@ -98,8 +124,9 @@ class ChatBot:
 
     async def forward_message(self, dabibody_ws):
         to_send = await self.twitch_give_best()
+        print(f"tc 127 forward_message {to_send=}")
         if to_send:
-            print(f"Forwarding message: {to_send=}")
+            print(f"tc 129 Forwarding message: {to_send=}")
             await dabibody_ws.send(json.dumps(to_send))
         await asyncio.sleep(1)
 
