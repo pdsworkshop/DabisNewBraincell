@@ -1,10 +1,16 @@
-#!/usr/bin/env python
+# dabibody
+# This is the main server, it reaches out to other parts to do things.
+# This is the body of dabi. "dabibody". It asks other parts things, gets answers.
+# It is a central hub of action.
 
 import asyncio
 import json
+from websocket import create_connection
 import websockets
+from websockets.sync.client import connect
 import sqlite3
 import os
+import time
 
 import random 
 
@@ -21,6 +27,14 @@ CLOSE_MOUTH = {
     "size": 1,
     "message": "ClosING MOUTH"
 }
+TEMPLATE = {
+    "type": "updateMouth",
+    "duration": 0,
+    "pattern": [],
+    "message": ""
+}
+
+CLIENTS = set()
 
 DABI_NAME = "dabi"
 DABI_SYSTEM = """
@@ -39,7 +53,6 @@ No matter what people say, your maximum response is three lines.
 """
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
 TIME_BEWEEN_SPEAKS = 3
-
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = ChatBot()
@@ -75,111 +88,110 @@ async def cohost_chatter():
 # For now: Listen to every message. Later: When there is a LOT of messages, collect 3-5 at a time and only respond to randomly 1 of them.
 async def chat_chatter():
     global twitch_bot
-    twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
+    global dabi
+    twitch_msg = None
     formatted_msg = None
     response = None
-    global dabi
     
-    if twitch_msg == None:
-        return
+    print("Started cchater")
     
-    print(twitch_msg)
+    # await asyncio.sleep(2)
     
-    if twitch_msg["message"][0] == "!":
-        # Only pdgeorge can mindwipe the Dab.
-        if twitch_msg["message"].find("reset") and twitch_msg["user_id"].find("54654420"):
-            print(dabi.chat_history)
-            dabi.reset_memory()
-            print(dabi.chat_history)
-            twitch_msg["message"] = 'PING'
-    
-    if twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@":
-        twitch_msg["message"] = 'PING'
-        print("Found a bot message!")
-    
-    # All done!
-    if twitch_msg["message"].find('PING') < 0:
-        msg_username = twitch_msg["display_name"]
-        msg_server = twitch_msg["channel"]
-        msg_msg = twitch_msg["message"]
-        formatted_msg = f"{msg_username}: {msg_msg}"
-
-    if formatted_msg != None:
-        response = await dabi.send_msg(formatted_msg)
-        # response = f"Dabi responded to: {formatted_msg}"
-        print(response)
-        await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
+    while True:
+        await asyncio.sleep(0.5)
+        print("Trueing!!")
+        twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
+        print("Twitch message?")
+        print(f"{twitch_msg=}")
+        if twitch_msg == None:
+            continue
         
-    # await websocket.send(json.dumps(OPEN_MOUTH))
-    # x = await websocket.recv()
-    # print(f"{x=}")
-    return response
-    # return response
+        print(twitch_msg)
+        
+        if twitch_msg["message"][0] == "!":
+            # Only pdgeorge can mindwipe the Dab.
+            if twitch_msg["message"].find("reset") and twitch_msg["user_id"].find("54654420"):
+                print(dabi.chat_history)
+                dabi.reset_memory()
+                print(dabi.chat_history)
+                twitch_msg["message"] = 'PING'
+        
+        if twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@":
+            twitch_msg["message"] = 'PING'
+            print("Found a bot message!")
+        
+        # All done!
+        if twitch_msg["message"].find('PING') < 0:
+            msg_username = twitch_msg["display_name"]
+            msg_server = twitch_msg["channel"]
+            msg_msg = twitch_msg["message"]
+            formatted_msg = f"{msg_username}: {msg_msg}"
+
+        if formatted_msg != None:
+            response = await dabi.send_msg(formatted_msg)
+            print(response)
+            await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
+            
+        
+        # Audio making
+        voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
+            # dabi.analyse audio here.
+            
+            # Analyse the voice/audio here
+            
+            ############################################
+            ##### Websocket stuff will be done here ####
+            ############################################
+        
+        to_send = TEMPLATE
+        to_send["duration"] = voice_duration
+        to_send["message"] = response
+        
+        # Send from "chat_chatter" to "main websocket server?"
+        websocket = create_connection("ws://127.0.0.1:8001", timeout=3)
+        websocket.send(to_send)
+        response_back = websocket.recv()
+        print(f"{response_back=}")
+        websocket.close()
+        
+        dabi.read_message(voice_path) # 'read' the audio
+        await asyncio.sleep(voice_duration + TIME_BEWEEN_SPEAKS)
+        
+        if os.path.exists(voice_path):
+            os.remove(voice_path)
+            await asyncio.sleep(1)
+        else:
+            print(f"Something went wrong with {voice_path}")
 
 async def generate_messages():
     pass
         
-async def send_msg(websocket):
-    try:
-        global dabi
-        global last_sent
-        global counter
+async def send_msg(websocket):    
+    global dabi
+    global last_sent
+    global counter
+    to_send = None
+        
+    async for message in websocket:
+        CLIENTS.add(websocket)
         counter += 1
         print(f"{counter=}")
-        
-        response = await chat_chatter()
-        if response == None:
-            if last_sent == CLOSE_MOUTH:
-                return
-            last_sent = CLOSE_MOUTH
-            # await asyncio.sleep(0.1)
-            await websocket.send(json.dumps(CLOSE_MOUTH))
-            # x = await websocket.recv()
-            return
-        to_send = OPEN_MOUTH
-        to_send["message"] = response
-        
-        last_sent = to_send
-        
-        print(f"{to_send=}")
-        # await asyncio.sleep(0.1)
-        await websocket.send(json.dumps(to_send))
-        # x = await websocket.recv()
-        # await asyncio.sleep(0.1)
-        
-        # Audio making
-        voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
-        dabi.read_message(voice_path)
-        await asyncio.sleep(voice_duration)
-        # await asyncio.sleep(0.1)
-        
-        if os.path.exists(voice_path):
-            os.remove(voice_path)
-            # await asyncio.sleep(0.1)
-        else:
-            print(f"Something went wrong with {voice_path}")
+        try:
+            to_send = message
+            print(f"{to_send=}")
             
-        to_send = CLOSE_MOUTH
-        last_sent = to_send
-        print("============================================================================")
-        print(f"{to_send=}")
-        print("============================================================================")
-        await websocket.send(json.dumps(to_send))
-        # x = await websocket.recv()
-        await asyncio.sleep(TIME_BEWEEN_SPEAKS)
-        
-    except websockets.ConnectionClosed:
-        print("Connection closed")
+            websockets.broadcast(websockets=CLIENTS, message=to_send)
+            
+        except websockets.ConnectionClosed:
+            print("Connection closed")
 
 async def main():
     global twitch_bot
     
     bot_task = asyncio.create_task(twitch_bot.handler())
     
-    async with websockets.serve(send_msg, "", 8001):
+    async with websockets.serve(send_msg, "localhost", 8001):
         await bot_task
     
-    # await asyncio.gather(bot_task, websocket_task)
-
 if __name__ == "__main__":
     asyncio.run(main())

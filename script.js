@@ -15,7 +15,8 @@ function connect(){
     ws = new WebSocket('ws://localhost:8001');
 
     ws.onopen = () => {
-    console.log('WebSocket connection opened');
+        console.log('WebSocket connection opened');
+        ws.send('{"message": "Hello"}');
     };
 
     ws.onmessage = (event) => {
@@ -29,8 +30,6 @@ function connect(){
             default:
                 console.log(`There is no ${data.type} prepared.`)
         }
-        ws.send(200);
-        return false;
     };
 
     ws.onerror = (error) => {
