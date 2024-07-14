@@ -11,11 +11,29 @@ function showMessage(message) {
     window.setTimeout(() => window.alert(message), 50);
 }
 
+function iterateArrayWithDelay(inputArray) {
+    console.log(inputArray);
+    inputArray = inputArray.map(parseFloat);
+    console.log(inputArray);
+    let i = 0;
+    let interval = setInterval(function() {
+        if (i >= inputArray.length) {
+            clearInterval(interval);
+            console.log('Interval complete');
+            return;
+        }
+        setFrame(Math.round(inputArray[i])+1);
+        console.log('28 i is: ' + i);
+        i += 1;
+    }, 1000); 
+}
+
 function connect(){    
     ws = new WebSocket('ws://localhost:8001');
 
     ws.onopen = () => {
-    console.log('WebSocket connection opened');
+        console.log('WebSocket connection opened');
+        ws.send(`{"msg_user": "Pdgeorge", "msg_server": "pdgeorge", "msg_msg": "Wake up Dabi, it's time to get to work.", "formatted_msg": "twitch:Pdgeorge: Wake up Dabi, it's time to get to work."}`)
     };
 
     ws.onmessage = (event) => {
@@ -23,11 +41,11 @@ function connect(){
         console.log('Received data:', data);
         switch (data.type) {
             case 'updateMouth':
-                setFrame(data.size);
-                console.log(data.message)
+                // setFrame(data.size);
+                iterateArrayWithDelay(data.pattern);
                 break;
             default:
-                showMessage(`There is no ${data.type} prepared.`)
+                console.log(`There is no ${data.type} prepared.`)
         }
     };
 

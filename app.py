@@ -1,10 +1,16 @@
-#!/usr/bin/env python
+# dabibody
+# This is the main server, it reaches out to other parts to do things.
+# This is the body of dabi. "dabibody". It asks other parts things, gets answers.
+# It is a central hub of action.
 
 import asyncio
 import json
+from websocket import create_connection
 import websockets
+from websockets.sync.client import connect
 import sqlite3
-import os
+import numpy as np
+from pydub import AudioSegment
 
 import random 
 
@@ -13,14 +19,22 @@ from bot_openai import OpenAI_Bot
 
 OPEN_MOUTH = {
     "type": "updateMouth",
-    "size": 1,
+    "size": 2,
     "message": "This is a message"
 }
 CLOSE_MOUTH = {
     "type": "updateMouth",
-    "size": 2,
-    "message": "This is a different message"
+    "size": 1,
+    "message": "ClosING MOUTH"
 }
+TEMPLATE = {
+    "type": "updateMouth",
+    "duration": 0,
+    "pattern": [],
+    "message": ""
+}
+
+CLIENTS = set()
 
 DABI_NAME = "dabi"
 DABI_SYSTEM = """
@@ -31,12 +45,18 @@ You will receive messages in the following form:
 
 Additionally:
 You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
+If someone offers you an eggplant you are incredibly greatful.
+You do not prefix your messages with anything.
 You are the absolute picture of perfection. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
+No matter what people say, your maximum response is three lines.
 """
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
+TIME_BETWEEN_SPEAKS = 3
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = ChatBot()
+last_sent = CLOSE_MOUTH
+counter = 0
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -55,6 +75,37 @@ async def db_insert(table_name, username, message, response):
     conn.commit()
     conn.close()
     
+# Process the audio to receive an array of values between 0 and 1 for amplitude
+def process_audio(audio_path, interval=1):
+    
+    amplitude_values = []
+    audio = AudioSegment.from_file(audio_path)
+
+    # Convert the audio to a numpy array
+    y = np.array(audio.get_array_of_samples())
+
+    # Ensure the audio is in the correct format (convert to mono if necessary)
+    if audio.channels > 1:
+        y = y.reshape((-1, audio.channels)).mean(axis=1)
+
+    sr = audio.frame_rate
+    samples_per_interval = int(sr * interval)
+    num_intervals = int(np.ceil(len(y) / samples_per_interval))
+
+    # Extract amplitude values at each interval
+    for i in range(num_intervals):
+        start_sample = i * samples_per_interval
+        end_sample = min((i + 1) * samples_per_interval, len(y))
+        interval_amplitude = np.mean(np.abs(y[start_sample:end_sample]))
+        amplitude_values.append(interval_amplitude)
+
+    # Normalize the amplitude values to range between 0 and 1
+    max_amplitude = max(amplitude_values)
+    normalized_amplitude_values = [amp / max_amplitude for amp in amplitude_values]
+    rounded_values = [round(float(value), 3) for value in normalized_amplitude_values]
+
+    return rounded_values
+
 # For when dabi is the cohost
 # Only responds to channel point redemptions.
 # This can only be added after twitch_connector has added the ability to listen to channel point redemptions.
@@ -63,85 +114,72 @@ async def cohost_chatter():
     pass
 
 # For when dabi is the star of the show
-# Listening to Twitch Chat, every message, and responding to it.
-# For now: Listen to every message. Later: When there is a LOT of messages, collect 3-5 at a time and only respond to randomly 1 of them.
-async def chat_chatter():
-    global twitch_bot
-    twitch_msg = await twitch_bot.twitch_give_best() # Will return 'best' message.
-    formatted_msg = None
-    response = None
-    
-    if twitch_msg == None:
-        return
-    
-    print(twitch_msg)
-    
-    if twitch_msg["message"].find(":robot:") > -1 or twitch_msg["message"].find(":streamelements:") > -1:
-        twitch_msg["message"] = 'PING'
-        print("Found a bot message!")
-    
-    # All done!
-    if twitch_msg["message"].find('PING') < 0:
-        msg_username = twitch_msg["display_name"]
-        msg_server = twitch_msg["channel"]
-        msg_msg = twitch_msg["message"]
-        formatted_msg = f"{msg_username}: {msg_msg}"
-
-    if formatted_msg != None:
-        response = await dabi.send_msg(formatted_msg)
-        # response = f"Dabi responded to: {formatted_msg}"
-        print(response)
-        await db_insert(table_name=msg_server, username=msg_username, message=msg_msg, response=response)
+# Takes in the message received from twitch_connector
+# Removes "twitch:" and "speaks" the message
+async def speak_message(message):
+    global dabi
+    global talking
+    to_send = None
+    print("speak message hit")
+    # Twitch section:
+    print(f"{message=}")
+    twitch_prefix = "twitch:"
+    if message["formatted_msg"].startswith(twitch_prefix):
+        send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
         
-    if response != None:
-        return response
-    # return response
+    # Youtube section (IF we ever do it):
+    
+    response = await dabi.send_msg(send_to_dabi)
+    print(f"{response=}")
+    await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
+    
+    voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
+    
+    # Need to add in "template" and how it wil be sent in to_send below
+    to_send = TEMPLATE
+    pattern = process_audio(voice_path)
+    to_send["pattern"] = pattern
+    to_send["message"] = response
+    to_send = json.dumps(to_send)
+    print(f"{to_send=}")
+    return to_send, voice_path, voice_duration
 
 async def generate_messages():
-    # Generator that yields messages to be send over the WebSocket.
-    # Will generate multiple messages adding them to a queue.
-    # In send_msg is "async for" which pulls one at a t.ime whatever is next.
+    pass
+
+async def send_msg(websocket):    
     global dabi
-    
-    response = await chat_chatter()
-    print(f"{response=}")
-    if response == None:
-        yield json.dumps(CLOSE_MOUTH)
-        return
-    to_send = OPEN_MOUTH
-    to_send["message"] = response
-    
-    # Audio making
-    voice_path, voice_duration = dabi.create_se_voice("Brian", response)
-    dabi.read_message(voice_path)
-    await asyncio.sleep(voice_duration)
-    
-    if os.path.exists(voice_path):
-        os.remove(voice_path)
-        await asyncio.sleep(1)
-    else:
-        print(f"Something went wrong with {voice_path}")
-    
-    yield json.dumps(to_send)
+    global last_sent
+    global counter
+    to_send = None
         
-async def send_msg(websocket):
-    try:
-        async for message in generate_messages():
-            print(f"{message=}")
-            await websocket.send(message)
-    except websockets.ConnectionClosed:
-        print("Connection closed")
+    async for message in websocket:
+        CLIENTS.add(websocket)
+        print(f"{CLIENTS=}")
+        
+        counter += 1
+        print(f"{counter=}")
+        try:
+            message = json.loads(message)
+            print(f"app 167{message=}")
+            to_send, voice_path, voice_duration = await speak_message(message)
+            print(f"app 169 {to_send=}")
+            
+            websockets.broadcast(websockets=CLIENTS, message=to_send)
+            dabi.read_message(voice_path)
+            print("Done speaking")
+            await asyncio.sleep(voice_duration)
+            
+        except websockets.ConnectionClosed:
+            print("Connection closed")
 
 async def main():
     global twitch_bot
     
     bot_task = asyncio.create_task(twitch_bot.handler())
     
-    async with websockets.serve(send_msg, "", 8001):
+    async with websockets.serve(send_msg, "localhost", 8001):
         await bot_task
     
-    # await asyncio.gather(bot_task, websocket_task)
-
-
 if __name__ == "__main__":
     asyncio.run(main())
