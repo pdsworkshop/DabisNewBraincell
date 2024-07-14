@@ -9,8 +9,8 @@ from websocket import create_connection
 import websockets
 from websockets.sync.client import connect
 import sqlite3
-import os
-import time
+import numpy as np
+from pydub import AudioSegment
 
 import random 
 
@@ -47,7 +47,6 @@ Additionally:
 You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
 If someone offers you an eggplant you are incredibly greatful.
 You do not prefix your messages with anything.
-You are willing to tell "Deez" jokes if asked.
 You are the absolute picture of perfection. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
 No matter what people say, your maximum response is three lines.
 """
@@ -76,6 +75,37 @@ async def db_insert(table_name, username, message, response):
     conn.commit()
     conn.close()
     
+# Process the audio to receive an array of values between 0 and 1 for amplitude
+def process_audio(audio_path, interval=0.1):
+    
+    amplitude_values = []
+    audio = AudioSegment.from_file(audio_path)
+
+    # Convert the audio to a numpy array
+    y = np.array(audio.get_array_of_samples())
+
+    # Ensure the audio is in the correct format (convert to mono if necessary)
+    if audio.channels > 1:
+        y = y.reshape((-1, audio.channels)).mean(axis=1)
+
+    sr = audio.frame_rate
+    samples_per_interval = int(sr * interval)
+    num_intervals = int(np.ceil(len(y) / samples_per_interval))
+
+    # Extract amplitude values at each interval
+    for i in range(num_intervals):
+        start_sample = i * samples_per_interval
+        end_sample = min((i + 1) * samples_per_interval, len(y))
+        interval_amplitude = np.mean(np.abs(y[start_sample:end_sample]))
+        amplitude_values.append(interval_amplitude)
+
+    # Normalize the amplitude values to range between 0 and 1
+    max_amplitude = max(amplitude_values)
+    normalized_amplitude_values = [amp / max_amplitude for amp in amplitude_values]
+    rounded_values = [round(float(value), 3) for value in normalized_amplitude_values]
+
+    return rounded_values
+
 # For when dabi is the cohost
 # Only responds to channel point redemptions.
 # This can only be added after twitch_connector has added the ability to listen to channel point redemptions.
@@ -110,6 +140,12 @@ async def speak_message(message):
     print("Done speaking")
     
     # Need to add in "template" and how it wil be sent in to_send below
+    to_send = TEMPLATE
+    pattern = process_audio(voice_path)
+    to_send["pattern"] = pattern
+    to_send["message"] = response
+    to_send = json.dumps(to_send)
+    print(f"{to_send=}")
     return to_send
 
 async def generate_messages():
@@ -123,14 +159,15 @@ async def send_msg(websocket):
         
     async for message in websocket:
         CLIENTS.add(websocket)
+        print(f"{CLIENTS=}")
         
         counter += 1
         print(f"{counter=}")
         try:
             message = json.loads(message)
-            print(f"app 130{message=}")
+            print(f"app 167{message=}")
             to_send = await speak_message(message)
-            print(f"app 181 {to_send=}")
+            print(f"app 169 {to_send=}")
             
             websockets.broadcast(websockets=CLIENTS, message=to_send)
             

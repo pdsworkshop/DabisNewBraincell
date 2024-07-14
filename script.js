@@ -16,6 +16,7 @@ function connect(){
 
     ws.onopen = () => {
         console.log('WebSocket connection opened');
+        ws.send(`{'msg_user': 'Pdgeorge', 'msg_server': 'pdgeorge', 'msg_msg': "Wake up Dabi, it's time to get to work.", 'formatted_msg': "twitch:Pdgeorge: Wake up Dabi, it's time to get to work."}`)
     };
 
     ws.onmessage = (event) => {
@@ -23,7 +24,8 @@ function connect(){
         console.log('Received data:', data);
         switch (data.type) {
             case 'updateMouth':
-                setFrame(data.size);
+                // setFrame(data.size);
+                console.log(data.pattern)
                 console.log(data.message)
                 break;
             default:

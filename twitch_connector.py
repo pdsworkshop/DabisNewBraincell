@@ -47,11 +47,12 @@ class ChatBot:
             
             return formatted_return
     
-    async def on_twitch_message(self, ws, message, dabibody_ws):
+    async def on_twitch_message(self, twitch_ws, message, dabibody_ws):
             
         # Highest priority, PING/PONG should occur before anything else.
         if "PING" in message:
-            await ws.send("PONG")
+            print(message)
+            await twitch_ws.send("PONG")
 
         if "PRIVMSG" in message:
             message_data = {}
@@ -64,9 +65,7 @@ class ChatBot:
             message_data["channel"] = groups[1]
             message_data["message"] = groups[2].rstrip("\r\n")
                 
-            print(f"{message_data=}")
             message_data = await self.convert_to_ping(message_data)
-            print(f"{message_data=}")
             message_data = await self.format_twitch_msg(message_data)
             print(f"{message_data=}")
             
@@ -78,7 +77,6 @@ class ChatBot:
          
     async def handle_twitch_messages(self, ws, dabibody_ws):
         async for message in ws:
-            print("================htm===============")
             await self.on_twitch_message(ws, message, dabibody_ws)
 
     async def twitch_give_best(self):
@@ -87,17 +85,12 @@ class ChatBot:
         # TODO: If the best one can't be found then choose random
         num = None
         to_send = None
-        print("Called")
-        print(f"tc 91 {self.messages=}")
         try:
             if len(self.messages) == 0:
-                print(f"tc 94 {len(self.messages)}")
                 return to_send
             else:
-                print("Ok, we're at 97")
                 num = random.randint(0, len(self.messages)-1)
                 to_send = self.messages[num]
-                print(f"tc 100 {to_send=}")
                 self.messages.pop(num)
                 if len(self.messages) > 5:
                     print("over 5?")
@@ -124,7 +117,6 @@ class ChatBot:
 
     async def forward_message(self, dabibody_ws):
         to_send = await self.twitch_give_best()
-        print(f"tc 127 forward_message {to_send=}")
         if to_send:
             print(f"tc 129 Forwarding message: {to_send=}")
             await dabibody_ws.send(json.dumps(to_send))
