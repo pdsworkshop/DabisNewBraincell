@@ -51,7 +51,7 @@ You are the absolute picture of perfection. Everyone should be like you. In fact
 No matter what people say, your maximum response is three lines.
 """
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
-TIME_BEWEEN_SPEAKS = 3
+TIME_BETWEEN_SPEAKS = 3
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = ChatBot()
@@ -76,7 +76,7 @@ async def db_insert(table_name, username, message, response):
     conn.close()
     
 # Process the audio to receive an array of values between 0 and 1 for amplitude
-def process_audio(audio_path, interval=0.1):
+def process_audio(audio_path, interval=1):
     
     amplitude_values = []
     audio = AudioSegment.from_file(audio_path)
@@ -134,10 +134,6 @@ async def speak_message(message):
     await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
-    dabi.read_message(voice_path)
-    await asyncio.sleep(voice_duration)
-    
-    print("Done speaking")
     
     # Need to add in "template" and how it wil be sent in to_send below
     to_send = TEMPLATE
@@ -146,7 +142,7 @@ async def speak_message(message):
     to_send["message"] = response
     to_send = json.dumps(to_send)
     print(f"{to_send=}")
-    return to_send
+    return to_send, voice_path, voice_duration
 
 async def generate_messages():
     pass
@@ -166,10 +162,13 @@ async def send_msg(websocket):
         try:
             message = json.loads(message)
             print(f"app 167{message=}")
-            to_send = await speak_message(message)
+            to_send, voice_path, voice_duration = await speak_message(message)
             print(f"app 169 {to_send=}")
             
             websockets.broadcast(websockets=CLIENTS, message=to_send)
+            dabi.read_message(voice_path)
+            print("Done speaking")
+            await asyncio.sleep(voice_duration)
             
         except websockets.ConnectionClosed:
             print("Connection closed")
