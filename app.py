@@ -53,6 +53,8 @@ No matter what people say, your maximum response is three lines.
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
 TIME_BETWEEN_SPEAKS = 3
 
+CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
+
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = ChatBot()
 last_sent = CLOSE_MOUTH
@@ -160,13 +162,16 @@ async def send_msg(websocket):
         counter += 1
         print(f"{counter=}")
         try:
-            message = json.loads(message)
+            try:
+                message = json.loads(message)
+            except:
+                print(message)
             print(f"app 167{message=}")
             to_send, voice_path, voice_duration = await speak_message(message)
             print(f"app 169 {to_send=}")
             
             websockets.broadcast(websockets=CLIENTS, message=to_send)
-            dabi.read_message(voice_path)
+            dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
             print("Done speaking")
             await asyncio.sleep(voice_duration)
             
