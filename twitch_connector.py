@@ -52,7 +52,7 @@ class ChatBot:
         # Highest priority, PING/PONG should occur before anything else.
         if "PING" in message:
             print(message)
-            await twitch_ws.send("PONG")
+            await twitch_ws.send("PONG :tmi.twitch.tv")
 
         if "PRIVMSG" in message:
             message_data = {}
@@ -75,9 +75,9 @@ class ChatBot:
             
             # websocket = websockets.connect("ws://localhost:8001")
          
-    async def handle_twitch_messages(self, ws, dabibody_ws):
-        async for message in ws:
-            await self.on_twitch_message(ws, message, dabibody_ws)
+    async def handle_twitch_messages(self, twitch_ws, dabibody_ws):
+        async for message in twitch_ws:
+            await self.on_twitch_message(twitch_ws, message, dabibody_ws)
 
     async def twitch_give_best(self):
         # Currently just returning a random message
@@ -92,8 +92,8 @@ class ChatBot:
                 num = random.randint(0, len(self.messages)-1)
                 to_send = self.messages[num]
                 self.messages.pop(num)
-                if len(self.messages) > 5:
-                    print("over 5?")
+                if len(self.messages) > 3:
+                    print("over 3?")
                     self.messages = []
                 return to_send
         except Exception as exception:

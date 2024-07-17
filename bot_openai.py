@@ -18,6 +18,9 @@ import requests
 import base64
 import requests
 import urllib.parse
+import pyaudio
+from pydub import AudioSegment
+from pydub.playback import _play_with_simpleaudio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -246,6 +249,23 @@ class OpenAI_Bot():
         sd.play(data, sample_rate, device=device_id)
         sd.wait()
 
+    def read_message_choose_device_mp3(self, mp3_path, device_index=None):
+        audio = AudioSegment.from_mp3(mp3_path)
+        raw_data = audio.raw_data
+        p = pyaudio.PyAudio()
+        
+        stream = p.open(format=p.get_format_from_width(audio.sample_width),
+                        channels=audio.channels,
+                        rate=audio.frame_rate,
+                        output=True,
+                        output_device_index=device_index)
+        
+        stream.write(raw_data)
+        
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+
     # Listens to the audio input when connected in Discord
     def discord_colab(self, listen_for):
         heard_msg = speech_listener(listen_for)
@@ -380,10 +400,10 @@ class OpenAI_Bot():
 
         return opus_file_path, rounded_duration
 
-def scan_audio_devices():
-    devices = sd.query_devices()
-    for i, device in enumerate(devices):
-        print(f"{i}: {device}")
+    def scan_audio_devices(self):
+        devices = sd.query_devices()
+        for i, device in enumerate(devices):
+            print(f"{i}: {device}")
 
 async def testing_main():
     test_bot = OpenAI_Bot(DEFAULT_NAME, SYSTEM_MESSAGE)

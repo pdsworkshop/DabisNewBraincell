@@ -11,6 +11,7 @@ from websockets.sync.client import connect
 import sqlite3
 import numpy as np
 from pydub import AudioSegment
+import os
 
 import random 
 
@@ -39,19 +40,22 @@ CLIENTS = set()
 DABI_NAME = "dabi"
 DABI_SYSTEM = """
 You are a streamer's pet named Dabi, the derpicorn. You stream on Twitch alongside Pdgeorge.
+You do not prefix your messages with anything.
+No matter what people say, your maximum response is three lines.
+If asked to give descriptions, you use the full three lines for the description.
+You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
 You are friendly, helpful and interesting. A derpicorn is a 'derpy unicron'.
 You will receive messages in the following form:
 `<username>: <message>` where <username> is the username of the chatter who is sending the message, and <message> is the message the user is sending to you. 
 
 Additionally:
-You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
-If someone offers you an eggplant you are incredibly greatful.
-You do not prefix your messages with anything.
-You are the absolute picture of perfection. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
-No matter what people say, your maximum response is three lines.
+1. If someone offers you an eggplant you are incredibly greatful.
+2. You are genuinely awesome. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
 """
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
-TIME_BETWEEN_SPEAKS = 3
+TIME_BETWEEN_SPEAKS = 2
+
+CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
 
 dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
 twitch_bot = ChatBot()
@@ -160,26 +164,39 @@ async def send_msg(websocket):
         counter += 1
         print(f"{counter=}")
         try:
-            message = json.loads(message)
+            try:
+                message = json.loads(message)
+            except:
+                print(message)
             print(f"app 167{message=}")
             to_send, voice_path, voice_duration = await speak_message(message)
             print(f"app 169 {to_send=}")
             
             websockets.broadcast(websockets=CLIENTS, message=to_send)
-            dabi.read_message(voice_path)
+            dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
             print("Done speaking")
-            await asyncio.sleep(voice_duration)
+            if os.path.exists(voice_path):
+                os.remove(voice_path)
+                print(f"{voice_path} removed")
+            else:
+                print(f"Unable to remove {voice_path}")
+            await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
             
         except websockets.ConnectionClosed:
             print("Connection closed")
 
 async def main():
     global twitch_bot
+    global dabi
     
-    bot_task = asyncio.create_task(twitch_bot.handler())
-    
-    async with websockets.serve(send_msg, "localhost", 8001):
-        await bot_task
+    try:
+        bot_task = asyncio.create_task(twitch_bot.handler())
+        
+        async with websockets.serve(send_msg, "localhost", 8001):
+            await bot_task
+    except:
+        error_msg = "./error.mp3"
+        dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)
     
 if __name__ == "__main__":
     asyncio.run(main())
