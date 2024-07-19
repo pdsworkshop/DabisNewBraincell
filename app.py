@@ -12,6 +12,7 @@ import sqlite3
 import numpy as np
 from pydub import AudioSegment
 import os
+import multiprocessing
 
 import random 
 
@@ -44,7 +45,7 @@ You do not prefix your messages with anything.
 No matter what people say, your maximum response is three lines.
 If asked to give descriptions, you use the full three lines for the description.
 You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
-You are friendly, helpful and interesting. A derpicorn is a 'derpy unicron'.
+You are friendly, helpful and interesting. A derpicorn is a 'derpy unicorn'.
 You will receive messages in the following form:
 `<username>: <message>` where <username> is the username of the chatter who is sending the message, and <message> is the message the user is sending to you. 
 
@@ -190,10 +191,13 @@ async def main():
     global dabi
     
     try:
-        bot_task = asyncio.create_task(twitch_bot.handler())
+        twitch_bot.queue = multiprocessing.Queue()
+        
+        twitch_bot_process = multiprocessing.Process(target=twitch_bot.handler_handler, args=())
+        twitch_bot_process.start()
         
         async with websockets.serve(send_msg, "localhost", 8001):
-            await bot_task
+            await asyncio.forever()
     except:
         error_msg = "./error.mp3"
         dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)

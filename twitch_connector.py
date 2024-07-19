@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import multiprocessing
 import asyncio
 import random
 import os
@@ -15,6 +16,7 @@ class ChatBot:
         self.messages = []
         pattern = r"@(.*?) :.*?.tmi.twitch.tv PRIVMSG #(.*?) :(.*)"
         self.regex_pattern = re.compile(pattern)
+        self.queue = None
         
     async def convert_to_ping(self, twitch_msg):
         if twitch_msg["message"][0] == "!":
@@ -47,7 +49,7 @@ class ChatBot:
             
             return formatted_return
     
-    async def on_twitch_message(self, twitch_ws, message, dabibody_ws):
+    async def on_twitch_message(self, twitch_ws, message):
             
         # Highest priority, PING/PONG should occur before anything else.
         if "PING" in message:
@@ -71,13 +73,13 @@ class ChatBot:
             
             self.messages.append(message_data)
             
-            await self.forward_message(dabibody_ws)
+            await self.forward_message()
             
             # websocket = websockets.connect("ws://localhost:8001")
          
-    async def handle_twitch_messages(self, twitch_ws, dabibody_ws):
+    async def handle_twitch_messages(self, twitch_ws):
         async for message in twitch_ws:
-            await self.on_twitch_message(twitch_ws, message, dabibody_ws)
+            await self.on_twitch_message(twitch_ws, message)
 
     async def twitch_give_best(self):
         # Currently just returning a random message
@@ -115,28 +117,24 @@ class ChatBot:
         await ws.send("JOIN #" + self.channel)
         print("### connected to Twitch IRC API ###")
 
-    async def forward_message(self, dabibody_ws):
+    async def forward_message(self):
         to_send = await self.twitch_give_best()
         if to_send:
-            print(f"tc 129 Forwarding message: {to_send=}")
-            await dabibody_ws.send(json.dumps(to_send))
+            print(f"tc 123 Queueing message: {to_send=}")
+            self.queue.put(json.dumps(to_send))
         await asyncio.sleep(1)
 
     async def handler(self):
         # Make connection to Twitch
         async with websockets.connect("wss://irc-ws.chat.twitch.tv:443") as twitch_ws:
             await self.on_open(twitch_ws)
-            # Make connection to the main app.py - dabibody
-            async with websockets.connect("ws://localhost:8001") as dabibody_ws:
-                twitch_task = asyncio.create_task(self.handle_twitch_messages(twitch_ws, dabibody_ws))
-                # forwarding_task = asyncio.create_task(self.forward_message(dabibody_ws))
-                
-                # await asyncio.gather(twitch_task, forwarding_task)
-                
-                await twitch_task
+            twitch_task = asyncio.create_task(self.handle_twitch_messages(twitch_ws))
             
+            await twitch_task
             
-    
+    def handler_handler(self):
+        asyncio.run(self.handler())
+            
 if __name__ == "__main__":
     bot = ChatBot()
     asyncio.run(bot.handler())
