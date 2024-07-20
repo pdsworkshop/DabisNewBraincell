@@ -12,10 +12,12 @@ import sqlite3
 import numpy as np
 from pydub import AudioSegment
 import os
+import multiprocessing
+import sys
 
 import random 
+import traceback
 
-from twitch_connector import ChatBot
 from bot_openai import OpenAI_Bot
 
 OPEN_MOUTH = {
@@ -35,8 +37,6 @@ TEMPLATE = {
     "message": ""
 }
 
-CLIENTS = set()
-
 DABI_NAME = "dabi"
 DABI_SYSTEM = """
 You are a streamer's pet named Dabi, the derpicorn. You stream on Twitch alongside Pdgeorge.
@@ -44,7 +44,7 @@ You do not prefix your messages with anything.
 No matter what people say, your maximum response is three lines.
 If asked to give descriptions, you use the full three lines for the description.
 You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
-You are friendly, helpful and interesting. A derpicorn is a 'derpy unicron'.
+You are friendly, helpful and interesting. A derpicorn is a 'derpy unicorn'.
 You will receive messages in the following form:
 `<username>: <message>` where <username> is the username of the chatter who is sending the message, and <message> is the message the user is sending to you. 
 
@@ -56,9 +56,6 @@ DABI_VOICE = None # If I decide to give Dabi a real voice later.
 TIME_BETWEEN_SPEAKS = 2
 
 CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
-
-dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
-twitch_bot = ChatBot()
 last_sent = CLOSE_MOUTH
 counter = 0
 
@@ -120,9 +117,7 @@ async def cohost_chatter():
 # For when dabi is the star of the show
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
-async def speak_message(message):
-    global dabi
-    global talking
+async def speak_message(message, dabi):
     to_send = None
     print("speak message hit")
     # Twitch section:
@@ -151,52 +146,52 @@ async def speak_message(message):
 async def generate_messages():
     pass
 
-async def send_msg(websocket):    
-    global dabi
+async def send_msg(websocket, path, dabi, twitch_queue):
     global last_sent
     global counter
     to_send = None
-        
-    async for message in websocket:
-        CLIENTS.add(websocket)
-        print(f"{CLIENTS=}")
-        
+
+    if twitch_queue.qsize() > 0:
+        message = twitch_queue.get()
+        print(f"app.py send_msg: {message=}")
         counter += 1
         print(f"{counter=}")
-        try:
-            try:
-                message = json.loads(message)
-            except:
-                print(message)
-            print(f"app 167{message=}")
-            to_send, voice_path, voice_duration = await speak_message(message)
-            print(f"app 169 {to_send=}")
-            
-            websockets.broadcast(websockets=CLIENTS, message=to_send)
-            dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
-            print("Done speaking")
-            if os.path.exists(voice_path):
-                os.remove(voice_path)
-                print(f"{voice_path} removed")
-            else:
-                print(f"Unable to remove {voice_path}")
-            await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
-            
-        except websockets.ConnectionClosed:
-            print("Connection closed")
+        message = json.loads(message)
+        print(message)
+        to_send, voice_path, voice_duration = await speak_message(message, dabi)
+        
+        # websockets.broadcast(websockets=CLIENTS, message=to_send)
+        await websocket.send(to_send)
+        
+        dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
+        print("Done speaking")
+        if os.path.exists(voice_path):
+            os.remove(voice_path)
+            print(f"{voice_path} removed")
+        else:
+            print(f"Unable to remove {voice_path}")
+        await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
-async def main():
-    global twitch_bot
-    global dabi
+async def main(twitch_queue):
+    dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
+
+    # Reminder to self: 
+    # Need to have "A" websocket connection or this won't work.
+    async def handler(websocket, path):
+        await send_msg(websocket, path, dabi, twitch_queue)
     
     try:
-        bot_task = asyncio.create_task(twitch_bot.handler())
-        
-        async with websockets.serve(send_msg, "localhost", 8001):
-            await bot_task
-    except:
-        error_msg = "./error.mp3"
-        dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)
-    
+        async with websockets.serve(handler, "localhost", 8001):
+            await asyncio.Future()
+    except Exception as e:
+        # error_msg = "./error.mp3"
+        # dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)
+        print("An exception occured:", e)
+        traceback.print_exc()
+          
+def pre_main(twitch_queue):
+    asyncio.run(main(twitch_queue))
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("Do not run this solo any more.\nRun this through main.py")
+    exit(0)
