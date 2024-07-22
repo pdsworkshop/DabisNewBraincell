@@ -1,12 +1,10 @@
 from dotenv import load_dotenv
-import multiprocessing
 import asyncio
 import random
 import os
 import websockets
 import re
 import json
-import time
 
 class ChatBot:
     def __init__(self):
@@ -23,7 +21,7 @@ class ChatBot:
             # Only pdgeorge can mindwipe the Dab.
             if twitch_msg["message"].find("reset") and twitch_msg["user_id"].find("54654420"):
                 self.reset_memory()
-                twitch_msg["message"] = 'PING'
+                twitch_msg["message"] = 'RESET'
         
         if twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@":
             twitch_msg["message"] = 'PING'
