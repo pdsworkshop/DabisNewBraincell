@@ -24,7 +24,6 @@ async def main():
         twitch_bot_process = multiprocessing.Process(target=twitch_bot.handler_handler, args=(twitch_queue,))
         twitch_bot_process.start()
         
-        # This is just to understand what is happening a bit better
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))
         app_process.start()
         app_process.join()

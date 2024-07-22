@@ -12,8 +12,6 @@ import sqlite3
 import numpy as np
 from pydub import AudioSegment
 import os
-import multiprocessing
-import sys
 
 import random 
 import traceback
@@ -53,7 +51,7 @@ Additionally:
 2. You are genuinely awesome. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
 """
 DABI_VOICE = None # If I decide to give Dabi a real voice later.
-TIME_BETWEEN_SPEAKS = 2
+TIME_BETWEEN_SPEAKS = 10
 
 CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
 last_sent = CLOSE_MOUTH
@@ -172,8 +170,28 @@ async def send_msg(websocket, path, dabi, twitch_queue):
             print(f"Unable to remove {voice_path}")
         await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
+def load_personality(personality_to_load):
+    name_to_return = None
+    voice_to_return = None
+    personality_to_return = None
+    base_system = None
+    with open("system.json", "r") as f:
+        data = json.load(f)
+        
+    name_to_return = data["name"]
+    voice_to_return = data["voice"]
+    base_system = data["system"]
+    for personality in data["personalities"]:
+        if personality["personality"] == personality_to_load:
+            personality_to_return = personality["system"]
+            break
+    personality_to_return = base_system + personality_to_return
+    
+    return name_to_return, voice_to_return, personality_to_return
+
 async def main(twitch_queue):
-    dabi = OpenAI_Bot(bot_name=DABI_NAME, system_message=DABI_SYSTEM, voice=DABI_VOICE)
+    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+    dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
     # Reminder to self: 
     # Need to have "A" websocket connection or this won't work.
