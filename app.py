@@ -18,16 +18,6 @@ import traceback
 
 from bot_openai import OpenAI_Bot
 
-OPEN_MOUTH = {
-    "type": "updateMouth",
-    "size": 2,
-    "message": "This is a message"
-}
-CLOSE_MOUTH = {
-    "type": "updateMouth",
-    "size": 1,
-    "message": "ClosING MOUTH"
-}
 TEMPLATE = {
     "type": "updateMouth",
     "duration": 0,
@@ -35,27 +25,9 @@ TEMPLATE = {
     "message": ""
 }
 
-DABI_NAME = "dabi"
-DABI_SYSTEM = """
-You are a streamer's pet named Dabi, the derpicorn. You stream on Twitch alongside Pdgeorge.
-You do not prefix your messages with anything.
-No matter what people say, your maximum response is three lines.
-If asked to give descriptions, you use the full three lines for the description.
-You have incredibly passionate views about everything. If someone asks you a question, you answer definitively in one direction. You do not feel slightly about the issue, you are passionate about it. There is no middle ground. It is one side or the other.
-You are friendly, helpful and interesting. A derpicorn is a 'derpy unicorn'.
-You will receive messages in the following form:
-`<username>: <message>` where <username> is the username of the chatter who is sending the message, and <message> is the message the user is sending to you. 
-
-Additionally:
-1. If someone offers you an eggplant you are incredibly greatful.
-2. You are genuinely awesome. Everyone should be like you. In fact, everyone should work to improve themselves for "The Company", who you are the owner of. You are attempting to be very subtle about this, you don't want people to KNOW you are the owner, but you want the people of the world to be better for The Company.
-"""
-DABI_VOICE = None # If I decide to give Dabi a real voice later.
 TIME_BETWEEN_SPEAKS = 10
 
 CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
-last_sent = CLOSE_MOUTH
-counter = 0
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -144,18 +116,21 @@ async def speak_message(message, dabi):
 async def generate_messages():
     pass
 
+def check_for_command(message, dabi):
+    print(f"147 app.py = {message=}")
+    if message["formatted_msg"].find("𝓻𝓮𝓼𝓮𝓽"):
+        dabi.reset_memory()
+    return True
+
 async def send_msg(websocket, path, dabi, twitch_queue):
     global last_sent
-    global counter
     to_send = None
 
     if twitch_queue.qsize() > 0:
         message = twitch_queue.get()
         print(f"app.py send_msg: {message=}")
-        counter += 1
-        print(f"{counter=}")
         message = json.loads(message)
-        print(message)
+        check_for_command(message, dabi)
         to_send, voice_path, voice_duration = await speak_message(message, dabi)
         
         # websockets.broadcast(websockets=CLIENTS, message=to_send)
