@@ -19,11 +19,10 @@ class ChatBot:
     async def convert_to_ping(self, twitch_msg):
         if twitch_msg["message"][0] == "!":
             # Only pdgeorge can mindwipe the Dab.
-            if twitch_msg["message"].find("reset") and twitch_msg["user_id"].find("54654420"):
-                self.reset_memory()
-                twitch_msg["message"] = 'RESET'
+            if twitch_msg["message"].find("reset") and twitch_msg["user_id"] == "54654420":
+                twitch_msg["message"] = '𝓻𝓮𝓼𝓮𝓽'
         
-        if twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@":
+        elif twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@" or twitch_msg["message"].find("𝓻𝓮𝓼𝓮𝓽") > -1:
             twitch_msg["message"] = 'PING'
             print("Found a bot message!")
             
@@ -80,9 +79,10 @@ class ChatBot:
             await self.on_twitch_message(twitch_ws, message, twitch_queue)
 
     async def twitch_give_best(self):
-        # Currently just returning a random message
-        # We want to later choose the best one
-        # TODO: If the best one can't be found then choose random
+        # Program was modified so it now is not needed to be implemented this side.
+        # Now it returns the messages as fast as it receives them.
+        # Leaving in the small buffer for if chat messages come in too fast.
+        # One day might need a "choose_best" on app.py's side if chat ever becomes super fast.
         num = None
         to_send = None
         try:
