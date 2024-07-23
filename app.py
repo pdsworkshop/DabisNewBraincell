@@ -118,9 +118,11 @@ async def generate_messages():
 
 def check_for_command(message, dabi):
     print(f"147 app.py = {message=}")
-    if message["formatted_msg"].find("𝓻𝓮𝓼𝓮𝓽"):
+    if message["formatted_msg"].find("𝓻𝓮𝓼𝓮𝓽") > -1:
+        dabi.wink_flag = True
         dabi.reset_memory()
-    return True
+        message["formatted_msg"] = "Memory has been reset."
+    return message
 
 async def send_msg(websocket, path, dabi, twitch_queue):
     global last_sent
@@ -130,7 +132,9 @@ async def send_msg(websocket, path, dabi, twitch_queue):
         message = twitch_queue.get()
         print(f"app.py send_msg: {message=}")
         message = json.loads(message)
-        check_for_command(message, dabi)
+        print(f"{dabi.wink_flag=}")
+        message = check_for_command(message, dabi)
+        print(f"{dabi.wink_flag=}")
         to_send, voice_path, voice_duration = await speak_message(message, dabi)
         
         # websockets.broadcast(websockets=CLIENTS, message=to_send)

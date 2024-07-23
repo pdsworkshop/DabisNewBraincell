@@ -17,12 +17,14 @@ class ChatBot:
         self.regex_pattern = re.compile(pattern)
         
     async def convert_to_ping(self, twitch_msg):
+        words = len(twitch_msg['message'].split())
+        print(f"{words=}")
         if twitch_msg["message"][0] == "!":
             # Only pdgeorge can mindwipe the Dab.
             if twitch_msg["message"].find("reset") and twitch_msg["user_id"] == "54654420":
                 twitch_msg["message"] = '𝓻𝓮𝓼𝓮𝓽'
         
-        elif twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@" or twitch_msg["message"].find("𝓻𝓮𝓼𝓮𝓽") > -1:
+        elif twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@" or twitch_msg["message"].find("𝓻𝓮𝓼𝓮𝓽") > -1 or words == 1:
             twitch_msg["message"] = 'PING'
             print("Found a bot message!")
             
