@@ -5,38 +5,53 @@ import os
 import websockets
 import re
 import json
+import twitchio
+import twitchio.ext.pubsub
+from twitchio.ext import pubsub
 
-class ChatBot:
-    def __init__(self):
-        load_dotenv()
-        self.oauth = os.getenv("ACCESS_TOKEN")
-        self.nick = os.getenv("BOT_NICK")
-        self.channel = os.getenv("CHANNEL")
-        self.messages = []
-        pattern = r"@(.*?) :.*?.tmi.twitch.tv PRIVMSG #(.*?) :(.*)"
-        self.regex_pattern = re.compile(pattern)
+load_dotenv()
         
-    async def convert_to_ping(self, twitch_msg):
-        words = len(twitch_msg['message'].split())
-        print(f"{words=}")
-        if twitch_msg["message"][0] == "!":
-            # Only pdgeorge can mindwipe the Dab.
-            if twitch_msg["message"].find("reset") and twitch_msg["user_id"] == "54654420":
-                twitch_msg["message"] = '𝓻𝓮𝓼𝓮𝓽'
+client = twitchio.Client(token=os.getenv("ACCESS_TOKEN"))
+client.pubsub = pubsub.PubSubPool(client)
+
+load_dotenv()
+oauth = os.getenv("ACCESS_TOKEN")
+irc_nick = os.getenv("BOT_NICK")
+channel = os.getenv("CHANNEL")
+
+pubsub_twitch_queue = None
+
+PATTERN = r"@(.*?) :.*?.tmi.twitch.tv PRIVMSG #(.*?) :(.*)"
+REGEX_PATTERN = re.compile(PATTERN)
         
-        elif twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@" or twitch_msg["message"].find("𝓻𝓮𝓼𝓮𝓽") > -1 or words == 1:
-            twitch_msg["message"] = 'PING'
-            print("Found a bot message!")
-            
-        return twitch_msg
+##########################################################
+### The below is related to pubsub events              ###
+### Channel Points, follows, subscriptions, etc.       ###
+### Things that cannot be handled by WebSocket comms   ###
+##########################################################
+
+@client.event()
+async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):    
+    to_send = await extract_chan_point_info(event._data)
     
-    async def format_twitch_msg(self, twitch_msg):
-        formatted_msg = None
-        
-        if twitch_msg["message"].find("PING") < 0:
-            msg_username = twitch_msg["display_name"]
-            msg_server = twitch_msg["channel"]
-            msg_msg = twitch_msg["message"]
+    pubsub_twitch_queue.put(json.dumps(to_send))
+    
+# For extracting information required, only will work for specified channel point redemptions
+# When adding a new channel point redemption, add a channel point redeem, make sure it allows text inputs
+# Make note of the name that it uses.
+async def extract_chan_point_info(pubsub_msg):
+    formatted_msg = None
+    formatted_return = None
+    
+    chosen_redemptions = ["DabicornTTS", "Ask Dabi A Q"]
+    for redeem in chosen_redemptions:
+        if redeem == pubsub_msg["message"]["data"]["redemption"]["reward"]["title"]:
+            print("========================FOUND========================")
+            print(pubsub_msg["message"]["data"]["redemption"]["user_input"])
+            
+            msg_username = pubsub_msg["message"]["data"]["redemption"]["user"]["display_name"]
+            msg_server = str(pubsub_msg["message"]["data"]["redemption"]["channel_id"])
+            msg_msg = pubsub_msg["message"]["data"]["redemption"]["user_input"]
             formatted_msg = f"twitch:{msg_username}: {msg_msg}"
             
             formatted_return = {
@@ -46,95 +61,127 @@ class ChatBot:
                 "formatted_msg": formatted_msg
             }
             
-            return formatted_return
+    return formatted_return
+            
     
-    async def on_twitch_message(self, twitch_ws, message, twitch_queue):
-            
-        # Highest priority, PING/PONG should occur before anything else.
-        if "PING" in message:
-            print(message)
-            await twitch_ws.send("PONG :tmi.twitch.tv")
+# For when Dabi is in assist mode
+async def assist():
+    topics = [
+        twitchio.ext.pubsub.channel_points(os.getenv("ACCESS_TOKEN"))[int(os.getenv("CHANNEL_ID"))]
+        ]
+    await client.pubsub.subscribe_topics(topics)
+    await client.start()
+    
+##########################################################
+### The below are all related to Twitch Chat Messaging ###
+### Reading from Twitch Chat. Formatting. etc.         ###
+##########################################################
 
-        if "PRIVMSG" in message:
-            message_data = {}
-            match = self.regex_pattern.search(message)
-            groups = match.groups()
-            key_value_pairs = groups[0].split(";")
-            for pair in key_value_pairs:
-                key, value = pair.split("=", 1)
-                message_data[key.replace("-", "_")] = value
-            message_data["channel"] = groups[1]
-            message_data["message"] = groups[2].rstrip("\r\n")
-                
-            message_data = await self.convert_to_ping(message_data)
-            message_data = await self.format_twitch_msg(message_data)
-            print(f"{message_data=}")
-            
-            self.messages.append(message_data)
-            
-            await self.forward_message(twitch_queue)
-            
-            # websocket = websockets.connect("ws://localhost:8001")
-         
-    async def handle_twitch_messages(self, twitch_ws, twitch_queue):
-        async for message in twitch_ws:
-            await self.on_twitch_message(twitch_ws, message, twitch_queue)
-
-    async def twitch_give_best(self):
-        # Program was modified so it now is not needed to be implemented this side.
-        # Now it returns the messages as fast as it receives them.
-        # Leaving in the small buffer for if chat messages come in too fast.
-        # One day might need a "choose_best" on app.py's side if chat ever becomes super fast.
-        num = None
-        to_send = None
-        try:
-            if len(self.messages) == 0:
-                return to_send
-            else:
-                num = random.randint(0, len(self.messages)-1)
-                to_send = self.messages[num]
-                self.messages.pop(num)
-                if len(self.messages) > 3:
-                    print("over 3?")
-                    self.messages = []
-                return to_send
-        except Exception as exception:
-            print(f"{exception}")
-            print(f"{self.messages=}")
-            print(f"{num=}")
-
-    async def on_error(self, ws, error):
-        print(error)
+async def convert_to_ping(twitch_msg):
+    words = len(twitch_msg['message'].split())
+    print(f"{words=}")
+    if twitch_msg["message"][0] == "!":
+        # Only pdgeorge can mindwipe the Dab.
+        if twitch_msg["message"].find("reset") and twitch_msg["user_id"] == "54654420":
+            twitch_msg["message"] = '𝓻𝓮𝓼𝓮𝓽'
+    
+    elif twitch_msg["message"].find("🤖") > -1 or twitch_msg["user_id"].find("100135110") > -1 or twitch_msg["message"][0] == "," or twitch_msg["message"][0] == "@" or twitch_msg["message"].find("𝓻𝓮𝓼𝓮𝓽") > -1 or words == 1:
+        twitch_msg["message"] = 'PING'
+        print("Found a bot message!")
         
-    async def on_close(self, ws, close_status_code, close_msg):
-        print("### closed connection ###")
+    return twitch_msg
+
+async def format_twitch_msg(twitch_msg):
+    formatted_msg = None
+    
+    if twitch_msg["message"].find("PING") < 0:
+        msg_username = twitch_msg["display_name"]
+        msg_server = twitch_msg["channel"]
+        msg_msg = twitch_msg["message"]
+        formatted_msg = f"twitch:{msg_username}: {msg_msg}"
         
-    async def on_open(self, ws):
-        print("### opened connection ###")
-        await ws.send("CAP REQ :twitch.tv/membership twitch.tv/tags twitch.tv/commands")
-        await ws.send("PASS oauth:" + self.oauth)
-        await ws.send("NICK " + self.nick)
-        await ws.send("JOIN #" + self.channel)
-        print("### connected to Twitch IRC API ###")
+        formatted_return = {
+            "msg_user": msg_username,
+            "msg_server": msg_server,
+            "msg_msg": msg_msg,
+            "formatted_msg": formatted_msg
+        }
+        
+        return formatted_return
 
-    async def forward_message(self, twitch_queue):
-        to_send = await self.twitch_give_best()
-        if to_send:
-            print(f"Queueing message: {to_send=}")
-            twitch_queue.put(json.dumps(to_send))
-        await asyncio.sleep(1)
+async def on_twitch_message(twitch_ws, message, twitch_queue):
+        
+    # Highest priority, PING/PONG should occur before anything else.
+    if "PING" in message:
+        print(message)
+        await twitch_ws.send("PONG :tmi.twitch.tv")
 
-    async def handler(self, twitch_queue):
-        # Make connection to Twitch
-        async with websockets.connect("wss://irc-ws.chat.twitch.tv:443") as twitch_ws:
-            await self.on_open(twitch_ws)
-            twitch_task = asyncio.create_task(self.handle_twitch_messages(twitch_ws, twitch_queue))
+    if "PRIVMSG" in message:
+        message_data = {}
+        match = REGEX_PATTERN.search(message)
+        groups = match.groups()
+        key_value_pairs = groups[0].split(";")
+        for pair in key_value_pairs:
+            key, value = pair.split("=", 1)
+            message_data[key.replace("-", "_")] = value
+        message_data["channel"] = groups[1]
+        message_data["message"] = groups[2].rstrip("\r\n")
             
-            await twitch_task
+        message_data = await convert_to_ping(message_data)
+        message_data = await format_twitch_msg(message_data)
+        print(f"{message_data=}")
+        
+        await forward_message(message_data, twitch_queue)
+        
+        # websocket = websockets.connect("ws://localhost:8001")
+        
+async def handle_twitch_messages(twitch_ws, twitch_queue):
+    async for message in twitch_ws:
+        await on_twitch_message(twitch_ws, message, twitch_queue)
+
+##########################################################
+### The below are related to everything Comms          ###
+### Connecting, Handling, Forwarding messages to Queue ###
+##########################################################
+
+async def on_error(ws, error):
+    print(error)
+    
+async def on_close(ws, close_status_code, close_msg):
+    print("### closed connection ###")
+    
+async def on_open(ws):
+    print("### opened connection ###")
+    await ws.send("CAP REQ :twitch.tv/membership twitch.tv/tags twitch.tv/commands")
+    await ws.send("PASS oauth:" + os.getenv("ACCESS_TOKEN"))
+    await ws.send("NICK " + os.getenv("BOT_NICK"))
+    await ws.send("JOIN #" + os.getenv("CHANNEL"))
+    print("### connected to Twitch IRC API ###")
+
+async def forward_message(message_data, twitch_queue):
+    to_send = message_data
+    if to_send:
+        print(f"Queueing message: {to_send=}")
+        twitch_queue.put(json.dumps(to_send))
+    await asyncio.sleep(1)
+
+async def handler(twitch_queue):
+    # Make connection to Twitch
+    async with websockets.connect("wss://irc-ws.chat.twitch.tv:443") as twitch_ws:
+        await on_open(twitch_ws)
+        twitch_task = asyncio.create_task(handle_twitch_messages(twitch_ws, twitch_queue))
+        
+        await twitch_task
             
-    def handler_handler(self, twitch_queue):
-        asyncio.run(self.handler(twitch_queue))
+def start_bot(mode, twitch_queue):
+    global pubsub_twitch_queue
+    print(mode)
+    if mode == "chat":
+        asyncio.run(handler(twitch_queue))
+    elif mode == "assist":
+        pubsub_twitch_queue = twitch_queue
+        print("Ready to assist!")
+        client.loop.run_until_complete(assist())
             
 if __name__ == "__main__":
-    bot = ChatBot()
-    asyncio.run(bot.handler())
+    print("lol main")

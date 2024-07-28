@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import asyncio
 import multiprocessing
 import time
-from twitch_connector import ChatBot
+import twitch_connector
 import app
 
 import random
@@ -18,10 +18,9 @@ def print_twitch_test(twitch_queue):
 
 async def main():
     try:
-        twitch_bot = ChatBot()
         twitch_queue = multiprocessing.Queue()
         
-        twitch_bot_process = multiprocessing.Process(target=twitch_bot.handler_handler, args=(twitch_queue,))
+        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
         twitch_bot_process.start()
         
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))

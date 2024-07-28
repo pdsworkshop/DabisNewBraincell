@@ -77,13 +77,6 @@ def process_audio(audio_path, interval=1):
 
     return rounded_values
 
-# For when dabi is the cohost
-# Only responds to channel point redemptions.
-# This can only be added after twitch_connector has added the ability to listen to channel point redemptions.
-async def cohost_chatter():
-    # TODO
-    pass
-
 # For when dabi is the star of the show
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
@@ -100,7 +93,8 @@ async def speak_message(message, dabi):
     
     response = await dabi.send_msg(send_to_dabi)
     print(f"{response=}")
-    await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
+    if message["msg_server"].isdigit() != True:
+        await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
     
@@ -169,7 +163,7 @@ def load_personality(personality_to_load):
     return name_to_return, voice_to_return, personality_to_return
 
 async def main(twitch_queue):
-    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+    dabi_name, dabi_voice, dabi_system = load_personality("surfer")
     dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
     # Reminder to self: 
