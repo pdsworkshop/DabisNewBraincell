@@ -20,7 +20,7 @@ async def main():
     try:
         twitch_queue = multiprocessing.Queue()
         
-        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
+        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("chat", twitch_queue,))
         twitch_bot_process.start()
         
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))

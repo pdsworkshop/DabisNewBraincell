@@ -107,15 +107,18 @@ async def speak_message(message, dabi):
     print(f"{to_send=}")
     return to_send, voice_path, voice_duration
 
-async def generate_messages():
-    pass
-
 def check_for_command(message, dabi):
-    print(f"147 app.py = {message=}")
-    if message["formatted_msg"].find("𝓻𝓮𝓼𝓮𝓽") > -1:
-        dabi.wink_flag = True
+    msg_arr = message["formatted_msg"].split(":")
+    msg = msg_arr[2]
+    print(f"113 ==== {msg_arr=}")
+    print(f"113 ==== {msg=}")
+    if msg == "𝓻𝓮𝓼𝓮𝓽":
         dabi.reset_memory()
-        message["formatted_msg"] = "Memory has been reset."
+        message["formatted_msg"] = "twitch:Memory has been reset."
+    if msg.find("!𝓬𝓱𝓪𝓷𝓰𝓮") > -1:
+        msg_arr_two = msg.split()
+        print(msg_arr_two[1])
+        load_new_personality(dabi, msg_arr_two[1])
     return message
 
 async def send_msg(websocket, path, dabi, twitch_queue):
@@ -125,10 +128,9 @@ async def send_msg(websocket, path, dabi, twitch_queue):
     if twitch_queue.qsize() > 0:
         message = twitch_queue.get()
         print(f"app.py send_msg: {message=}")
+        
         message = json.loads(message)
-        print(f"{dabi.wink_flag=}")
         message = check_for_command(message, dabi)
-        print(f"{dabi.wink_flag=}")
         to_send, voice_path, voice_duration = await speak_message(message, dabi)
         
         # websockets.broadcast(websockets=CLIENTS, message=to_send)
@@ -143,6 +145,16 @@ async def send_msg(websocket, path, dabi, twitch_queue):
             print(f"Unable to remove {voice_path}")
         await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
+def load_new_personality(dabi, personality_to_load):
+    print("Load_new_personality")
+    dabi_name, dabi_voice, dabi_system = load_personality(personality_to_load)
+    dabi.bot_name = dabi_name
+    dabi.voice = dabi_voice
+    dabi.temp_system_message["content"] = dabi_system
+    dabi.reset_memory()
+    print(dabi.chat_history)
+    
+
 def load_personality(personality_to_load):
     name_to_return = None
     voice_to_return = None
@@ -154,10 +166,12 @@ def load_personality(personality_to_load):
     name_to_return = data["name"]
     voice_to_return = data["voice"]
     base_system = data["system"]
-    for personality in data["personalities"]:
-        if personality["personality"] == personality_to_load:
-            personality_to_return = personality["system"]
+    for personality in data.get("personalities"):
+        if personality.get("personality") == personality_to_load:
+            personality_to_return = personality.get("system", None)
             break
+        if personality_to_return is None:
+            personality_to_return = data.get("personalities")[0].get("system", None)
     personality_to_return = base_system + personality_to_return
     
     return name_to_return, voice_to_return, personality_to_return
