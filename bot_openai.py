@@ -400,10 +400,19 @@ class OpenAI_Bot():
 
         return opus_file_path, rounded_duration
 
-    def scan_audio_devices(self):
+    # Returns only the good output channels
+    def scan_audio_devices(self, device_to_find = None):
         devices = sd.query_devices()
         for i, device in enumerate(devices):
-            print(f"{i}: {device}")
+            if device['max_output_channels'] >= 1:
+                print(f"{i}: {device}")
+                print(device['name'])
+                if device_to_find != None:
+                    if device_to_find in device['name']:
+                        print("==============================")
+                        print("NORMAL WORKED!")
+                        print(f"{i}: {device}")
+                        return i
 
 async def testing_main():
     test_bot = OpenAI_Bot(DEFAULT_NAME, SYSTEM_MESSAGE)
@@ -465,11 +474,14 @@ async def testing_main():
     # test_bot.chat_history.pop()
     # print("==============================================================")
 
-    se_path, se_duration = test_bot.create_se_voice("Brian", "This is a test?")
-    await asyncio.sleep(1)
-    test_bot.read_message(se_path)
-    await asyncio.sleep(se_duration)
-    print("Test complete")
+    test_bot.scan_audio_devices() # returns all
+    test_bot.scan_audio_devices(device_to_find = "CABLE-A Input (VB-Audio Cable A") # returns that specific one
+
+    # se_path, se_duration = test_bot.create_se_voice("Brian", "This is a test?")
+    # await asyncio.sleep(1)
+    # test_bot.read_message_choose_device_mp3(se_path, 26)
+    # await asyncio.sleep(se_duration)
+    # print("Test complete")
 
 if __name__ == "__main__":
     asyncio.run(testing_main())

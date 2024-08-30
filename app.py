@@ -27,7 +27,7 @@ TEMPLATE = {
 
 TIME_BETWEEN_SPEAKS = 10
 
-CABLE_A_OUTPUT = 13 # This was found using dabi.scan_audio_devices()
+CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
