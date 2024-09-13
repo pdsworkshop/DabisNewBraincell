@@ -177,7 +177,7 @@ def load_personality(personality_to_load):
     return name_to_return, voice_to_return, personality_to_return
 
 async def main(twitch_queue):
-    dabi_name, dabi_voice, dabi_system = load_personality("surfer")
+    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
     dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
     # Reminder to self: 

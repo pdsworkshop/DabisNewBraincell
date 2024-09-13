@@ -125,7 +125,7 @@ async def format_twitch_msg(twitch_msg):
         return formatted_return
 
 async def on_twitch_message(twitch_ws, message, twitch_queue):
-        
+    print(message)
     # Highest priority, PING/PONG should occur before anything else.
     if "PING" in message:
         print(message)
@@ -198,3 +198,6 @@ def start_bot(mode, twitch_queue):
             
 if __name__ == "__main__":
     print("lol main")
+    import multiprocessing
+    twitch_queue = multiprocessing.Queue()
+    start_bot("chat", twitch_queue)

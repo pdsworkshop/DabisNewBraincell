@@ -3,7 +3,9 @@ import asyncio
 import multiprocessing
 import time
 import twitch_connector
-import app
+import twitch_event_follow
+import follow_websocketsender
+import app 
 
 import random
 
@@ -19,13 +21,20 @@ def print_twitch_test(twitch_queue):
 async def main():
     try:
         twitch_queue = multiprocessing.Queue()
+        follow_queue = multiprocessing.Queue()
         
-        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("chat", twitch_queue,))
+        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
         twitch_bot_process.start()
-        
+
+        follow_bot_process = multiprocessing.Process(target=twitch_event_follow.start_events, args=(twitch_queue, follow_queue,))
+        follow_bot_process.start()
+
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))
         app_process.start()
         app_process.join()
+
+        # follow_sender = multiprocessing.Process(target=follow_websocketsender.pre_main, args=(follow_queue,))
+        # follow_sender.start()
     except KeyboardInterrupt as kb_interrupt:
         print(f"[!] Keyboard interrupt.\n{kb_interrupt}")
         twitch_bot_process.join()
