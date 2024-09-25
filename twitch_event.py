@@ -207,7 +207,6 @@ async def grab_followers():
     return all_followers
 
 async def main():
-    # await reward_new_follow("hezreal") # Call this directly to test
     global followers
     global not_dabi
     not_dabi = OpenAI_Bot(bot_name="not_dabi", system_message="You are a helpful bot that helps people generate AI images using prompts. You will be given a positive prompt, you will return a better positive prompt. Anything between << >> is incredibly important and MUST NOT be changed. DO NOT include << or >> yourself. You will always add a unique style or flair to each prompt.", voice=None)

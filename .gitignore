@@ -1,6 +1,7 @@
 # Specific files
 test*
 *.mp3
+.vs
 
 # Unwanted file types
 *.txt
