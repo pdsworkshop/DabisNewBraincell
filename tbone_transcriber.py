@@ -24,8 +24,8 @@ def transcriber(files):
     transcribed = {}
     for file in files:
         data = stt_pipeline(file, generate_kwargs={"max_new_tokens": 256}, return_timestamps=False)
-        transcribed["user"] = file[:-4]
-        transcribed["data"] = data
+        transcribed["msg_user"] = file[:-4]
+        transcribed["msg_msg"] = data["text"]
         # print("===============================")
         # print(f"tbone_transcriber: {transcribed["data"]=}")
         # print(f"tbone_transcriber: {transcribed=}")

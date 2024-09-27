@@ -85,8 +85,15 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
     returned_transcription = tbone_transcriber.transcriber(saved_files)
     # print(f"d_b.py: pre loop: {returned_transcription}")
     for transcription in returned_transcription:
-        # print(f"d_b.py: for t in r_t: {transcription=}")
-        global_discord_queue.put(json.dumps(transcription))
+        print(f"d_b.py: for t in r_t: {transcription=}")
+
+        # For Twitch
+        transcription["formatted_msg"] = f"twitch:{transcription["msg_user"]}: {transcription["msg_msg"]}"
+        transcription["msg_server"] = "pdgeorge"
+        to_send = transcription
+
+        print(f"{to_send=}")
+        global_discord_queue.put(json.dumps(to_send))
         
     # await channel.send(f"finished recording audio for: {', '.join(recorded_users)}.", files=files)  # Send a message with the accumulated files.
 

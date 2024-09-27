@@ -23,19 +23,17 @@ async def main():
     try:
         ### QUEUES ###
         twitch_queue = multiprocessing.Queue()
-        follow_queue = multiprocessing.Queue()
-        discord_queue = multiprocessing.Queue()
+        # discord_queue = multiprocessing.Queue()
 
         ### INGESTORS ###
-        twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
-        twitch_bot_process.start()
+        # twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
+        # twitch_bot_process.start()
         
-        follow_bot_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, follow_queue,))
-        follow_bot_process.start()
+        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue,))
+        event_process.start()
 
-        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(discord_queue,))
+        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,))
         discord_process.start()
-        print_test(discord_queue)
         
         ### MAIN APP ###
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))
@@ -46,9 +44,13 @@ async def main():
         # follow_sender.start()
     except KeyboardInterrupt as kb_interrupt:
         print(f"[!] Keyboard interrupt.\n{kb_interrupt}")
-        twitch_bot_process.join()
-        twitch_bot_process.terminate()
-        twitch_bot_process.close()
+        event_process.join()
+        event_process.terminate()
+        event_process.close()
+        
+        discord_process.join()
+        discord_process.terminate()
+        discord_process.close()
         
         app_process.join()
         app_process.terminate()

@@ -18,7 +18,6 @@ load_dotenv()
 followers = None
 not_dabi = None
 global_twitch_queue = None
-global_follow_queue = None
 
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN') # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('CHANNEL_ID')     # The channel ID of the channel you want to join
@@ -99,10 +98,44 @@ async def reward_new_follow(follower_name):
             return image.imageURL
     print("============================================================")
 
+async def handle_redemptions(event):
+    global global_twitch_queue
+    if event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {}) == "Ask Dabi A Q":
+        # print("Ask a Q")
+        # print(event)
+        # print(event.get('payload', {}).get('event', {}).get('user_name', {}))
+        # print(event.get('payload', {}).get('event', {}).get('user_input', {}))
+        to_send = await extract_message_to_send_points(event)
+        print(f"{to_send=}")
+        global_twitch_queue.put(json.dumps(to_send))
+        print("=====================================")
+        print(f"{global_twitch_queue.qsize()=}")
+        # for i in range(global_twitch_queue.qsize()):
+        #     print(i)
+        #     print(global_twitch_queue)
+        print("=====================================")
+
+async def extract_message_to_send_points(event):
+    formatted_msg = None
+    formatted_return = None
+
+    msg_username = event.get('payload', {}).get('event', {}).get('user_name', {})
+    msg_msg = event.get('payload', {}).get('event', {}).get('user_input', {})
+    msg_server = event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {})
+    formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+
+    formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+    
+    return formatted_return
+
 async def on_message(ws, message):
     global followers
     global global_twitch_queue
-    global global_follow_queue
     event = json.loads(message)
     if event['metadata']['message_type'] == 'session_welcome':
         session_id = event['payload']['session']['id']
@@ -122,6 +155,17 @@ async def on_message(ws, message):
             },{
                 'type': 'channel.chat.message',
                 'version': '1',
+                'condition': {
+                    "broadcaster_user_id": CHANNEL_ID,
+                    'user_id': CHANNEL_ID
+                },
+                'transport': {
+                    'method': 'websocket',
+                    'session_id': f'{session_id}',
+                }
+            },{
+                "type": "channel.channel_points_custom_reward_redemption.add",
+                "version": "1",
                 'condition': {
                     "broadcaster_user_id": CHANNEL_ID,
                     'user_id': CHANNEL_ID
@@ -157,14 +201,21 @@ async def on_message(ws, message):
                 "name": event.get('payload', {}).get('event', {}).get('user_login', {}),
                 "received_link": link_received
             }
-            global_follow_queue.put(json.dumps(follow_to_send))
-    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.chat.message':
-        print("=========================Inside channel.chat.message=========================")
+            global_twitch_queue.put(json.dumps(follow_to_send))
+    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
+        ############################################################
+        # Right now, we are receiving ALL channel point redemptions.
+        await handle_redemptions(event)
+        ############################################################
+    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.chat.message' and event.get('payload', {}).get('event', {}).get('channel_points_custom_reward_id', {}) == None:
+        # print("=========================Inside channel.chat.message=========================")
+        # Add in an if statement to check what mode Dabi is in.
+        # If Dabi is in "assist" or "chat" mode, where Dabi will respond to every or almost every chat message.
+        # print(event)
         print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
         print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
-        print("=========================Inside channel.chat.message=========================")
-    else:
-        print(event)
+        # print(chanpoint_test_thing)
+        # print("=========================Inside channel.chat.message=========================")
 
 async def ws_conn():
     url = 'wss://eventsub.wss.twitch.tv/ws'
@@ -216,20 +267,18 @@ async def main():
     await asyncio.gather(ws_conn())
     asyncio.run(ws_conn())
 
-def start_events(twitch_queue, follow_queue):
+def start_events(twitch_queue):
     global global_twitch_queue
-    global global_follow_queue
-    global_follow_queue = follow_queue
     global_twitch_queue = twitch_queue
     print("Followbot process has started")
     asyncio.run(main())
 
 def test_main():
     import multiprocessing
-    global global_twitch_queue
-    global global_follow_queue
-    global_follow_queue = multiprocessing.Queue()
-    global_twitch_queue = multiprocessing.Queue()
+    # global global_twitch_queue
+    # global global_follow_queue
+    # global_follow_queue = multiprocessing.Queue()
+    # global_twitch_queue = multiprocessing.Queue()
     print("Running the test version")
     asyncio.run(main())
 
