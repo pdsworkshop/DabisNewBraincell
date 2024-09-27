@@ -33,7 +33,7 @@ REGEX_PATTERN = re.compile(PATTERN)
 @client.event()
 async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
     to_send = await extract_chan_point_info(event._data)
-    
+    print(event.reward.title)
     if to_send != None:
         pubsub_twitch_queue.put(json.dumps(to_send))
         
