@@ -7,6 +7,7 @@ from discord.ext import commands
 import speech_recognition as sr
 from dotenv import load_dotenv
 import tbone_transcriber
+import asyncio
 
 load_dotenv()
 
