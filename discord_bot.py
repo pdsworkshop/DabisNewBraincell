@@ -38,8 +38,11 @@ async def record(ctx: discord.ApplicationContext):  # If you're using commands.B
     await ctx.respond(f"You are currently in {ctx.author.voice.channel.name}")
     voice = ctx.author.voice
     if not voice:
-        await ctx.respond("You aren't in a voice channel!")
-    vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
+        return await ctx.respond("You aren't in a voice channel!")
+    if not ctx.voice_client:
+        vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
+    else:
+        vc = ctx.voice_client
     connections.update({ctx.guild.id: vc})  # Updating the cache with the guild and channel.
 
     vc.start_recording(
@@ -48,8 +51,15 @@ async def record(ctx: discord.ApplicationContext):  # If you're using commands.B
         ctx.channel  # The channel to disconnect from.
     )
     await ctx.respond("Started recording!")
-    await asyncio.sleep(10)
+    await asyncio.sleep(20)
     await stop_recording(ctx)
+
+@bot.slash_command()
+async def communicate(ctx: discord.ApplicationContext):
+    await ctx.respond("Time for some chatting!")
+    while True:
+        await record(ctx)
+        await asyncio.sleep(30)
 
 # @bot.command()
 async def stop_recording(ctx: discord.ApplicationContext):
