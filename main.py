@@ -48,9 +48,9 @@ async def main():
         event_process.terminate()
         event_process.close()
         
-        discord_process.join()
-        discord_process.terminate()
-        discord_process.close()
+        # discord_process.join()
+        # discord_process.terminate()
+        # discord_process.close()
         
         app_process.join()
         app_process.terminate()

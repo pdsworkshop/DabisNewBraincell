@@ -7,7 +7,7 @@ from discord.ext import commands
 import speech_recognition as sr
 from dotenv import load_dotenv
 import tbone_transcriber
-
+import asyncio
 
 load_dotenv()
 
@@ -48,14 +48,17 @@ async def record(ctx: discord.ApplicationContext):  # If you're using commands.B
         ctx.channel  # The channel to disconnect from.
     )
     await ctx.respond("Started recording!")
+    await asyncio.sleep(10)
+    await stop_recording(ctx)
 
-@bot.command()
+# @bot.command()
 async def stop_recording(ctx: discord.ApplicationContext):
     if ctx.guild.id in connections:  # Check if the guild is in the cache.
         vc = connections[ctx.guild.id]
         vc.stop_recording()  # Stop recording, and call the callback (once_done).
-        del connections[ctx.guild.id]  # Remove the guild from the cache.
-        await ctx.delete()  # And delete.
+        # del connections[ctx.guild.id]  # Remove the guild from the cache.
+        # await ctx.delete()  # And delete.
+        await ctx.respond("Done")
     else:
         await ctx.respond("I am currently not recording here.")  # Respond with this if we aren't recording.
 
@@ -74,7 +77,7 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
         f"<@{user_id}>"
         for user_id, audio in sink.audio_data.items()
     ]
-    await sink.vc.disconnect()  # Disconnect from the voice channel.
+    # await sink.vc.disconnect()  # Disconnect from the voice channel.
     
     files = [discord.File(audio.file, f"{user_id}.{sink.encoding}") for user_id, audio in sink.audio_data.items()]  # List down the files.
     for file in files:
@@ -93,9 +96,11 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
         to_send = transcription
 
         print(f"{to_send=}")
+        # Need to add in a basic "convert user ID to name" function here.
+        # Don't need to hard code the things, can make it load from file for Discord ID/Name Key/Value pairs.
         global_discord_queue.put(json.dumps(to_send))
         
-    # await channel.send(f"finished recording audio for: {', '.join(recorded_users)}.", files=files)  # Send a message with the accumulated files.
+    await channel.send(f"Transcription for this message:\n\n{transcription["msg_msg"]}")  # Send a message with the transcription.
 
 def start_bot(discord_queue):
     global global_discord_queue
