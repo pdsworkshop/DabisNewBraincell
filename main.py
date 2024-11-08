@@ -23,7 +23,7 @@ async def main():
     try:
         ### QUEUES ###
         twitch_queue = multiprocessing.Queue()
-        # discord_queue = multiprocessing.Queue()
+        discord_queue = multiprocessing.Queue()
 
         ### INGESTORS ###
         # twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
@@ -32,13 +32,12 @@ async def main():
         event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue,))
         event_process.start()
 
-        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,))
+        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,discord_queue,))
         discord_process.start()
         
         ### MAIN APP ###
-        app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,))
+        app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,discord_queue,))
         app_process.start()
-        app_process.join()
 
         # follow_sender = multiprocessing.Process(target=follow_websocketsender.pre_main, args=(follow_queue,))
         # follow_sender.start()
