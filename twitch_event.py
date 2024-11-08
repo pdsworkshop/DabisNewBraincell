@@ -6,8 +6,6 @@ import requests
 import websockets
 import random
 from bot_openai import OpenAI_Bot
-from typing import List, Optional
-from runware import Runware, IImageInference, IImage, IError, RunwareAPIError, IPromptEnhance, IEnhancedPrompt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,87 +14,11 @@ load_dotenv()
 # logging.basicConfig(level=logging.INFO)
 
 followers = None
-not_dabi = None
 global_twitch_queue = None
 
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN') # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('CHANNEL_ID')     # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('CLIENT_ID')       # The same Client ID used to generate the access token
-RUNWARE_API = os.getenv('RUNWARE_API')
-ART_STYLES = [
-    "Pixel Art",
-    "Anime",
-    "3D Rendering",
-    "Abstract",
-    "Impressionism",
-    "Surrealism",
-    "Realism",
-    "Pop Art",
-    "Cartoon",
-    "Minimalism",
-    "Watercolor",
-    "Cyberpunk",
-    "Steampunk",
-    "Fantasy Art",
-    "Comic Book",
-    "Cubism",
-    "Concept Art",
-    "Baroque",
-    "Gothic",
-    "Graffiti"
-]
-
-def on_partial_images(images: List[IImage], error: Optional[IError]) -> None:
-    if error:
-        print(f"API Error: {error}")
-    else:
-        print(f"Received {len(images)} partial images")
-        for image in images:
-            print(f"Partial Image URL: {image.imageURL}")
-
-async def safe_request_images(runware: Runware, request_image: IImageInference):
-    try:
-        return await runware.imageInference(requestImage=request_image)
-    except RunwareAPIError as e:
-        print(f"API Error: {e}")
-        print(f"Error Code: {e.code}")
-        return None
-    except Exception as e:
-        print(f"Unexpected Error: {e}")
-        return None
-
-async def reward_new_follow(follower_name):
-    global not_dabi
-    runware = Runware(api_key=RUNWARE_API)
-    await runware.connect()
-
-    art_style = random.choice(ART_STYLES)
-    positive_prompt = f"A <<{art_style}>>, plush toy, white unicorn, <<{follower_name} is their name>>, <<{follower_name} themed character>>, <<corporate themed background>> office, city scape, cubical"
-    negative_prompt = "cloudy, two horns, rainy, nsfw, five legs, three legs, chinese background"
-    
-    better_prompt = await not_dabi.send_msg(positive_prompt)
-    not_dabi.reset_memory()
-    print(f"{positive_prompt=}")
-    print(f"{better_prompt=}")
-
-    request_image = IImageInference(
-        positivePrompt=better_prompt,
-        model="runware:100@1",
-        numberResults=1,
-        negativePrompt=negative_prompt,
-        useCache=False,
-        onPartialImages=on_partial_images,
-        height=512,
-        width=512,
-        outputFormat="PNG",
-    )
-    image_request_result = await safe_request_images(runware, request_image)
-    print("============================================================")
-    if image_request_result:
-        print("first result")
-        for image in image_request_result:
-            return image.imageURL
-    print("============================================================")
 
 async def handle_redemptions(event):
     global global_twitch_queue
@@ -195,13 +117,14 @@ async def on_message(ws, message):
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.follow':
         # print(f'[🔔] Event:\n{event}')
         if event.get('payload', {}).get('event', {}).get('user_login', {}) not in followers:
-            link_received = await reward_new_follow(event.get('payload', {}).get('event', {}).get('user_login', {}))
             followers.append(event.get('payload', {}).get('event', {}).get('user_login', {}))
             follow_to_send = {
                 "name": event.get('payload', {}).get('event', {}).get('user_login', {}),
-                "received_link": link_received
             }
             global_twitch_queue.put(json.dumps(follow_to_send))
+            print("=============FOLLOW=============")
+            print(json.dumps(follow_to_send))
+            print("=============FOLLOW=============")
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
         ############################################################
         # Right now, we are receiving ALL channel point redemptions.
@@ -259,8 +182,6 @@ async def grab_followers():
 
 async def main():
     global followers
-    global not_dabi
-    not_dabi = OpenAI_Bot(bot_name="not_dabi", system_message="You are a helpful bot that helps people generate AI images using prompts. You will be given a positive prompt, you will return a better positive prompt. Anything between << >> is incredibly important and MUST NOT be changed. DO NOT include << or >> yourself. You will always add a unique style or flair to each prompt.", voice=None)
     # run here once
     followers = await grab_followers()
 
