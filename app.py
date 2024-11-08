@@ -29,6 +29,8 @@ TIME_BETWEEN_SPEAKS = 10
 
 CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
+global_discord_queue = None
+
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
     db_name = 'dabibraincell.db'
@@ -136,14 +138,15 @@ async def send_msg(websocket, path, dabi, twitch_queue):
         # websockets.broadcast(websockets=CLIENTS, message=to_send)
         await websocket.send(to_send)
         
-        dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
+        # dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
+        global_discord_queue.put(voice_path)
+        await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
         print("Done speaking")
         if os.path.exists(voice_path):
             os.remove(voice_path)
             print(f"{voice_path} removed")
         else:
             print(f"Unable to remove {voice_path}")
-        await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
 def load_new_personality(dabi, personality_to_load):
     print("Load_new_personality")
@@ -194,7 +197,9 @@ async def main(twitch_queue):
         print("An exception occured:", e)
         traceback.print_exc()
           
-def pre_main(twitch_queue):
+def pre_main(twitch_queue, discord_queue):
+    global global_discord_queue
+    global_discord_queue = discord_queue
     asyncio.run(main(twitch_queue))
 
 if __name__ == "__main__":
