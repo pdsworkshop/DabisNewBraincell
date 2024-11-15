@@ -15,6 +15,7 @@ load_dotenv()
 
 followers = None
 global_twitch_queue = None
+global_chat_mode = False
 
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN') # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('CHANNEL_ID')     # The channel ID of the channel you want to join
@@ -75,6 +76,7 @@ async def extract_message_to_send_points(event):
 async def on_message(ws, message):
     global followers
     global global_twitch_queue
+    global global_chat_mode
     event = json.loads(message)
     if event['metadata']['message_type'] == 'session_welcome':
         session_id = event['payload']['session']['id']
@@ -92,17 +94,6 @@ async def on_message(ws, message):
                 'session_id': f'{session_id}',
             }
             },{
-                'type': 'channel.chat.message',
-                'version': '1',
-                'condition': {
-                    "broadcaster_user_id": CHANNEL_ID,
-                    'user_id': CHANNEL_ID
-                },
-                'transport': {
-                    'method': 'websocket',
-                    'session_id': f'{session_id}',
-                }
-            },{
                 "type": "channel.channel_points_custom_reward_redemption.add",
                 "version": "1",
                 'condition': {
@@ -115,6 +106,19 @@ async def on_message(ws, message):
                 }
             }
         ]
+        if global_chat_mode == True:
+            subscribe_array.append({
+                'type': 'channel.chat.message',
+                'version': '1',
+                'condition': {
+                    "broadcaster_user_id": CHANNEL_ID,
+                    'user_id': CHANNEL_ID
+                },
+                'transport': {
+                    'method': 'websocket',
+                    'session_id': f'{session_id}',
+                }
+            })
         for subscribe in subscribe_array:
             print(subscribe)
             response = requests.post(
@@ -209,9 +213,11 @@ async def main():
     await asyncio.gather(ws_conn())
     asyncio.run(ws_conn())
 
-def start_events(twitch_queue):
+def start_events(twitch_queue, chat_mode):
     global global_twitch_queue
+    global global_chat_mode
     global_twitch_queue = twitch_queue
+    global_chat_mode = chat_mode
     print("Followbot process has started")
     asyncio.run(main())
 
