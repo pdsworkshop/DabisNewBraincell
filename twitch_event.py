@@ -20,22 +20,39 @@ ACCESS_TOKEN = os.getenv('ACCESS_TOKEN') # Generated from your authentication me
 CHANNEL_ID = os.getenv('CHANNEL_ID')     # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('CLIENT_ID')       # The same Client ID used to generate the access token
 
+async def handle_twitch_msg(event):
+    global global_twitch_queue
+
+    to_send = await extract_message_to_send_chat(event)
+    print(f"handle_twitch_msg {to_send=}")
+    global_twitch_queue.put(json.dumps(to_send))
+
+async def extract_message_to_send_chat(event):
+    formatted_msg = None
+    formatted_return = None
+
+    msg_username = event.get('payload', {}).get('event', {}).get('chatter_user_login', {})
+    msg_msg = event.get('payload', {}).get('event', {}).get('message', {}).get('text', {})
+    msg_server = event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {})
+    formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+
+    formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+    
+    print(formatted_return)
+    return formatted_return
+
 async def handle_redemptions(event):
     global global_twitch_queue
     if event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {}) == "Ask Dabi A Q":
-        # print("Ask a Q")
-        # print(event)
-        # print(event.get('payload', {}).get('event', {}).get('user_name', {}))
-        # print(event.get('payload', {}).get('event', {}).get('user_input', {}))
+
         to_send = await extract_message_to_send_points(event)
-        print(f"{to_send=}")
+        print(f"handle_redemptions {to_send=}")
         global_twitch_queue.put(json.dumps(to_send))
-        print("=====================================")
-        print(f"{global_twitch_queue.qsize()=}")
-        # for i in range(global_twitch_queue.qsize()):
-        #     print(i)
-        #     print(global_twitch_queue)
-        print("=====================================")
 
 async def extract_message_to_send_points(event):
     formatted_msg = None
@@ -119,12 +136,16 @@ async def on_message(ws, message):
         if event.get('payload', {}).get('event', {}).get('user_login', {}) not in followers:
             followers.append(event.get('payload', {}).get('event', {}).get('user_login', {}))
             follow_to_send = {
-                "name": event.get('payload', {}).get('event', {}).get('user_login', {}),
+                "msg_user": event.get('payload', {}).get('event', {}).get('user_login', {}),
+                "msg_server": event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {}),
+                "msg_msg": "Has just followed!",
+                "formatted_msg": f"twitch:{event.get('payload', {}).get('event', {}).get('user_login', {})}: Has just followed!"
             }
             global_twitch_queue.put(json.dumps(follow_to_send))
-            print("=============FOLLOW=============")
+            print("========================follow_to_send===================")
             print(json.dumps(follow_to_send))
-            print("=============FOLLOW=============")
+            print(event)
+            print("========================follow_to_send===================")
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
         ############################################################
         # Right now, we are receiving ALL channel point redemptions.
@@ -134,9 +155,9 @@ async def on_message(ws, message):
         # print("=========================Inside channel.chat.message=========================")
         # Add in an if statement to check what mode Dabi is in.
         # If Dabi is in "assist" or "chat" mode, where Dabi will respond to every or almost every chat message.
-        # print(event)
-        print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
-        print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
+        await handle_twitch_msg(event)
+        # print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
+        # print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
         # print(chanpoint_test_thing)
         # print("=========================Inside channel.chat.message=========================")
 

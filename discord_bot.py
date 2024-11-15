@@ -76,6 +76,9 @@ async def listen(ctx: discord.ApplicationContext):
     try:
         while True:
             if global_discord_queue.qsize() > 0:
+                print("==========vc.is_connected=========")
+                print(f"{vc.is_connected()=}")
+                print("==========vc.is_connected=========")
                 to_play = global_discord_queue.get()
                 vc.stop()
                 print("Before calling vc.play")
