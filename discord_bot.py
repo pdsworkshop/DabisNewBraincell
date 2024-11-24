@@ -75,13 +75,16 @@ async def listen(ctx: discord.ApplicationContext):
     connections.update({ctx.guild.id: vc})  # Updating the cache with the guild and channel.
     try:
         while True:
+            if vc.is_playing():
+                await asyncio.sleep(1)
             if global_discord_queue.qsize() > 0:
+                print("==========vc.is_connected=========")
+                print(f"{vc.is_connected()=}")
+                print("==========vc.is_connected=========")
                 to_play = global_discord_queue.get()
                 vc.stop()
-                print("Before calling vc.play")
                 vc.play(discord.FFmpegPCMAudio(to_play))
                 print(f"Playing {to_play}")
-                await ctx.respond(to_play)
             await asyncio.sleep(0.1)
     except Exception as e:
         print(f"Somebody tell George Dabi's braincell asploded: {e}")

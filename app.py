@@ -110,9 +110,7 @@ async def speak_message(message, dabi):
     return to_send, voice_path, voice_duration
 
 def check_for_command(message, dabi):
-    msg_arr = message["formatted_msg"].split(":")
-    msg = msg_arr[2]
-    print(f"113 ==== {msg_arr=}")
+    msg = message.get("msg_msg", {})
     print(f"113 ==== {msg=}")
     if msg == "𝓻𝓮𝓼𝓮𝓽":
         dabi.reset_memory()

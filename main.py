@@ -26,10 +26,8 @@ async def main():
         discord_queue = multiprocessing.Queue()
 
         ### INGESTORS ###
-        # twitch_bot_process = multiprocessing.Process(target=twitch_connector.start_bot, args=("assist", twitch_queue,))
-        # twitch_bot_process.start()
-        
-        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue,))
+        listen_to_chat = True # Change whether you want Dabi to listen to chat messages or not
+        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, listen_to_chat,))
         event_process.start()
 
         discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,discord_queue,))
