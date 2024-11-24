@@ -47,6 +47,32 @@ async def extract_message_to_send_chat(event):
     print(formatted_return)
     return formatted_return
 
+async def handle_sub(event):
+    global global_twitch_queue
+
+    to_send = await extract_message_to_sub(event)
+    print(f"handle_twitch_msg {to_send=}")
+    global_twitch_queue.put(json.dumps(to_send))
+
+async def extract_message_to_sub(event):
+    formatted_msg = None
+    formatted_return = None
+
+    msg_username = event.get('payload', {}).get('event', {}).get('user_login', {})
+    msg_msg = "Has just subscribbed because they are a WIDEGIGACHAD"
+    msg_server = event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {})
+    formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+
+    formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+    
+    print(formatted_return)
+    return formatted_return
+
 async def handle_redemptions(event):
     global global_twitch_queue
     if event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {}) == "Ask Dabi A Q":
@@ -95,6 +121,17 @@ async def on_message(ws, message):
             }
             },{
                 "type": "channel.channel_points_custom_reward_redemption.add",
+                "version": "1",
+                'condition': {
+                    "broadcaster_user_id": CHANNEL_ID,
+                    'user_id': CHANNEL_ID
+                },
+                'transport': {
+                    'method': 'websocket',
+                    'session_id': f'{session_id}',
+                }
+            },{
+                "type": "channel.subscribe",
                 "version": "1",
                 'condition': {
                     "broadcaster_user_id": CHANNEL_ID,
@@ -164,6 +201,14 @@ async def on_message(ws, message):
         # print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
         # print(chanpoint_test_thing)
         # print("=========================Inside channel.chat.message=========================")
+    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.subscribe':
+        print("==========================================================")
+        print("Received subscription in the form of:")
+        print(event)
+        await handle_sub(event)
+        print("==========================================================")
+    else:
+        print(event)
 
 async def ws_conn():
     url = 'wss://eventsub.wss.twitch.tv/ws'
@@ -218,20 +263,22 @@ def start_events(twitch_queue, chat_mode):
     global global_chat_mode
     global_twitch_queue = twitch_queue
     global_chat_mode = chat_mode
-    print("Followbot process has started")
+    print("TwitchEvent process has started")
     asyncio.run(main())
 
-def test_main():
+async def test_main():
     import multiprocessing
-    # global global_twitch_queue
-    # global global_follow_queue
-    # global_follow_queue = multiprocessing.Queue()
-    # global_twitch_queue = multiprocessing.Queue()
-    print("Running the test version")
-    asyncio.run(main())
+    global global_twitch_queue
+    global_twitch_queue = multiprocessing.Queue()
+    # print("Running the test version")
+    # asyncio.run(main())
+    event = {"metadata": {"message_id": "tNd9S_fqeIIAQ-lYje6gCLkj_djvNYnbg6eewHva_LY=", "message_type": "notification", "message_timestamp": "2024-11-24T09:27:17.345Z", "subscription_type": "channel.subscribe", "subscription_version": "1"}, "payload": {"subscription": {"id": "3b72ed7d-3e1c-4780-91f7-9a50e2f279d3", "status": "enabled", "type": "channel.subscribe", "version": "1", "condition": {"broadcaster_user_id": "54654420"}, "transport": {"method": "websocket", "session_id": "AgoQg3GTuTNjTCqQFPZWFVeEqRIGY2VsbC1h"}, "created_at": "2024-11-24T09:25:43.241687839Z", "cost": 0}, "event": {"user_id": "921771386", "user_login": "hezreal_", "user_name": "hezreal_", "broadcaster_user_id": "54654420", "broadcaster_user_login": "pdgeorge", "broadcaster_user_name": "Pdgeorge", "tier": "1000", "is_gift": True}}}
+    await handle_sub(event)
+    print("About to get from queue")
+    print(global_twitch_queue.get())
 
 if __name__ == "__main__":
     try:
-        test_main()
+        asyncio.run(test_main())
     except KeyboardInterrupt:
         print('[❗] Application interrupted. Shutting down...')
