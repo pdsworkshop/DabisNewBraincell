@@ -125,6 +125,7 @@ async def communicate(ctx: discord.ApplicationContext):
             await asyncio.sleep(0.1)
     except Exception as e:
         print(f"Somebody tell George there has been an error in my braincell: {e}")
+        # TODO add a way for Dabi to scream that. Either once or loop it.
 
 # @bot.command()
 async def stop_recording(ctx: discord.ApplicationContext):
