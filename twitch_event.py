@@ -1,11 +1,8 @@
 import asyncio
 import json
-import logging
 import os
 import requests
 import websockets
-import random
-from bot_openai import OpenAI_Bot
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,9 +14,10 @@ followers = None
 global_twitch_queue = None
 global_chat_mode = False
 
-ACCESS_TOKEN = os.getenv('ACCESS_TOKEN') # Generated from your authentication mechanism, make sure it is scoped properly
-CHANNEL_ID = os.getenv('CHANNEL_ID')     # The channel ID of the channel you want to join
-CLIENT_ID = os.getenv('CLIENT_ID')       # The same Client ID used to generate the access token
+ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN') # Generated from your authentication mechanism, make sure it is scoped properly
+CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')     # The channel ID of the channel you want to join
+CLIENT_ID = os.getenv('DABI_CLIENT_ID')       # The same Client ID used to generate the access token
+BOT_USER_ID = os.getenv('BOT_USER_ID')
 
 async def handle_twitch_msg(event):
     global global_twitch_queue
@@ -120,22 +118,20 @@ async def on_message(ws, message):
                 'session_id': f'{session_id}',
             }
             },{
-                "type": "channel.channel_points_custom_reward_redemption.add",
-                "version": "1",
+                'type': 'channel.channel_points_custom_reward_redemption.add',
+                'version': '1',
                 'condition': {
-                    "broadcaster_user_id": CHANNEL_ID,
-                    'user_id': CHANNEL_ID
+                    "broadcaster_user_id": CHANNEL_ID
                 },
                 'transport': {
                     'method': 'websocket',
                     'session_id': f'{session_id}',
                 }
             },{
-                "type": "channel.subscribe",
-                "version": "1",
+                'type': 'channel.subscribe',
+                'version': '1',
                 'condition': {
-                    "broadcaster_user_id": CHANNEL_ID,
-                    'user_id': CHANNEL_ID
+                    "broadcaster_user_id": CHANNEL_ID
                 },
                 'transport': {
                     'method': 'websocket',
@@ -156,8 +152,13 @@ async def on_message(ws, message):
                     'session_id': f'{session_id}',
                 }
             })
+            print("===================")
+            print(f"{subscribe_array=}")
+            print("===================")
         for subscribe in subscribe_array:
-            print(subscribe)
+            print("===================")
+            print(f"{subscribe=}")
+            print("===================")
             response = requests.post(
                 'https://api.twitch.tv/helix/eventsub/subscriptions',
                 headers={
@@ -168,7 +169,9 @@ async def on_message(ws, message):
                 },
                 data=json.dumps(subscribe)
             )
+            print("===================")
             print(f'{response.content=}')
+            print("===================")
     
     elif event.get('metadata', {}).get('message_type', {}) == 'session_keepalive':
         pass
@@ -188,19 +191,23 @@ async def on_message(ws, message):
             print(event)
             print("========================follow_to_send===================")
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
+
+        print(event)
+
+
         ############################################################
         # Right now, we are receiving ALL channel point redemptions.
         await handle_redemptions(event)
         ############################################################
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.chat.message' and event.get('payload', {}).get('event', {}).get('channel_points_custom_reward_id', {}) == None:
-        # print("=========================Inside channel.chat.message=========================")
-        # Add in an if statement to check what mode Dabi is in.
-        # If Dabi is in "assist" or "chat" mode, where Dabi will respond to every or almost every chat message.
+        
+        print("=========================Inside channel.chat.message=========================")
+        print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
+        print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
+        print("=========================Inside channel.chat.message=========================")
+
         await handle_twitch_msg(event)
-        # print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
-        # print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
-        # print(chanpoint_test_thing)
-        # print("=========================Inside channel.chat.message=========================")
+
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.subscribe':
         print("==========================================================")
         print("Received subscription in the form of:")
@@ -266,16 +273,29 @@ def start_events(twitch_queue, chat_mode):
     print("TwitchEvent process has started")
     asyncio.run(main())
 
+def validate():
+    print("----")
+    print("Access Token:", ACCESS_TOKEN)
+    # print("Access token: exists")
+    print("----")
+
+    url = 'https://id.twitch.tv/oauth2/validate'
+    headers = {
+        'Authorization': f'OAuth {ACCESS_TOKEN}'
+    }
+    response = requests.get(url, headers=headers)
+    return response.json()
+
 async def test_main():
     import multiprocessing
     global global_twitch_queue
+    global global_chat_mode
+    global_chat_mode = True
     global_twitch_queue = multiprocessing.Queue()
-    # print("Running the test version")
-    # asyncio.run(main())
-    event = {"metadata": {"message_id": "tNd9S_fqeIIAQ-lYje6gCLkj_djvNYnbg6eewHva_LY=", "message_type": "notification", "message_timestamp": "2024-11-24T09:27:17.345Z", "subscription_type": "channel.subscribe", "subscription_version": "1"}, "payload": {"subscription": {"id": "3b72ed7d-3e1c-4780-91f7-9a50e2f279d3", "status": "enabled", "type": "channel.subscribe", "version": "1", "condition": {"broadcaster_user_id": "54654420"}, "transport": {"method": "websocket", "session_id": "AgoQg3GTuTNjTCqQFPZWFVeEqRIGY2VsbC1h"}, "created_at": "2024-11-24T09:25:43.241687839Z", "cost": 0}, "event": {"user_id": "921771386", "user_login": "hezreal_", "user_name": "hezreal_", "broadcaster_user_id": "54654420", "broadcaster_user_login": "pdgeorge", "broadcaster_user_name": "Pdgeorge", "tier": "1000", "is_gift": True}}}
-    await handle_sub(event)
-    print("About to get from queue")
-    print(global_twitch_queue.get())
+    print("Running the test version")
+    validate_response = validate()
+    print(validate_response)
+    await main()
 
 if __name__ == "__main__":
     try:
