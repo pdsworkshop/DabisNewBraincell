@@ -1,0 +1,140 @@
+import os
+import requests
+from dotenv import load_dotenv, set_key
+
+load_dotenv()
+
+CLIENT_ID = os.getenv('DABI_CLIENT_ID')
+CLIENT_SECRET = os.getenv('DABI_CLIENT_SECRET')
+REFRESH_TOKEN = os.getenv('DABI_REFRESH_TOKEN')
+TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+ENV_FILE = ".env"
+ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')
+CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
+USER_ID = os.getenv('BOT_USER_ID')
+
+def validate():
+    load_dotenv(override=True)
+    ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')
+    url = 'https://id.twitch.tv/oauth2/validate'
+
+    headers = {
+        'Authorization': f'OAuth {ACCESS_TOKEN}'
+    }
+
+    response = requests.get(url, headers=headers)
+    
+    return response.json()
+    
+def get_user(user):
+    url = f'https://api.twitch.tv/helix/users?login={user}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url, headers=headers)
+    
+    return response.json()
+    
+def timeout_user(user_name):
+    response = get_user(user_name)
+
+    user_id = response.get('data', {})[0].get('id', {})
+
+    url = f'https://api.twitch.tv/helix/moderation/bans?broadcaster_id={CHANNEL_ID}&moderator_id={CHANNEL_ID}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "data":
+        {
+            "user_id": user_id,
+            "duration": 1,
+            "reason": "test"
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()
+
+def send_msg(msg_to_send):
+    url = f'https://api.twitch.tv/helix/chat/messages'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "broadcaster_id": CHANNEL_ID,
+        "sender_id": CHANNEL_ID,
+        "message": msg_to_send
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    return response.json()
+
+def refresh_access_token(client_id, client_secret, refresh_token):
+    try:
+        # Parameters for the POST request
+        params = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }
+
+        # Make the POST request
+        response = requests.post(TOKEN_URL, params=params)
+        response_data = response.json()
+
+        if response.status_code == 200:
+            # Extract new tokens
+            access_token = response_data["access_token"]
+            refresh_token = response_data.get("refresh_token", refresh_token)
+
+            # Return tokens for further use
+            return access_token, refresh_token
+        else:
+            # Handle errors
+            print("Error refreshing token:", response_data)
+            return None, None
+
+    except Exception as e:
+        print("Exception occurred while refreshing token:", str(e))
+        return None, None
+    
+def update_access_token_in_env(access_token, env_file):
+    try:
+        set_key(env_file, "DABI_ACCESS_TOKEN", access_token)
+    except Exception as e:
+        print("Failed to update .env file:", str(e))
+
+def update_key():
+    new_access_token, new_refresh_token = refresh_access_token(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN)
+
+    if new_access_token:
+        print("Token refresh successful!")
+        update_access_token_in_env(new_access_token, ENV_FILE)
+        validate()
+        return new_access_token
+    else:
+        print("Token refresh failed.")
+
+# A list of example usages and testing
+if __name__ == "__main__":
+    new_key = update_key() # For updating the key
+    response = validate()
+    response = timeout_user("t_b0n3")
+    print(response)
+    response = get_user("pdgeorge")
+    response = send_msg("Hello, world!")

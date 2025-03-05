@@ -27,3 +27,8 @@ Please remember that this is a personal project. There are elements which I woul
 
 Credits:
 tbon_transcriber.py supplied by T-B0N3 with some modifications done by myself.
+
+Linux upgrade:
+sudo apt install build-essential
+sudo apt install portaudio19-dev
+pip install pyaudio

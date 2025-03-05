@@ -32,13 +32,16 @@ DEFAULT_NAME = "TAI" # Which personality is being loaded
 MESSAGE_CHANCE = 5 # Chance for user name to be included in the message, 1 in MESSAGE_CHANGE
 SYSTEM_MESSAGE = "You are 'BasedMod', moderator of a Twitch community you really do not like. This community is a community of people who watch v-tubers. In fact you greatly enjoy roasting them. Every time that you receive a message, you give a brief, one sentence vitriolic rant about the individual and what they said before declaring that they are banned followed by an inventive way that they are banished from the internet."
 WAKE_UP_MESSAGE = "It's time to wake up."
-APIKEY = os.getenv("OPENAI_API_KEY")
+# APIKEY = os.getenv("OPENAI_API_KEY") # For OPENAI
+BASE_URL="https://api.deepseek.com"
+APIKEY = os.getenv("DEEPSEEK_API_KEY") # For DEEPSEEK
 USER_ID = os.getenv("PLAY_HT_USER_ID")
 API_KEY = os.getenv("PLAY_HT_API_KEY")
 TIKTOK_TOKEN = os.getenv("TIKTOK_TOKEN")
 
 client = AsyncOpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
+    base_url=BASE_URL,
+    api_key=APIKEY
 )
 
 ERROR_MSG = {
@@ -62,26 +65,6 @@ def normalise_dir(dir):
     current_dir = os.getcwd()
     normalised_dir = os.path.normpath(os.path.join(current_dir, dir))
     return normalised_dir
-
-async def speech_listener_async(listen_for):
-    r = sr.Recognizer()
-    transcription = "Not yet"
-    with sr.Microphone() as source:
-        print("Recording started")
-        try:
-            audio = r.listen(source, timeout=listen_for, phrase_time_limit=listen_for)  # Capture the audio input
-        except sr.WaitTimeoutError:
-            print(f"No speech detected before {listen_for} seconds.")
-            return "" # No audio recorded, no string to transcribe, no string to return
-    try:
-        transcription = r.recognize_whisper(audio, language="english", model="base.en")  # Perform the speech-to-text transcription
-    except sr.UnknownValueError:
-        print("Speech recognition could not understand audio")
-        transcription = "Error"
-    except sr.RequestError as e:
-        print("Could not request speech recognition results; {0}".format(e))
-        transcription = "Error"
-    return transcription
 
 def speech_listener(listen_for):
     r = sr.Recognizer()
@@ -158,7 +141,7 @@ class OpenAI_Bot():
         self.chat_history.append(self.chat_message)
         try:
             response = await client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="deepseek-chat",
                 messages=self.chat_history,
                 temperature=0.6,
             )
@@ -168,6 +151,7 @@ class OpenAI_Bot():
             response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
         
         bot_response = {}
+        print(response)
         bot_response["role"] = response.choices[0].message.role
         bot_response["content"] = response.choices[0].message.content
         self.chat_history.append(bot_response)
@@ -452,9 +436,9 @@ async def testing_main():
     # print(response)
 
     ### Single message TTT version
-    # msg_to_test = "Do you like beatsaber?"
-    # response = await test_bot.send_msg(msg_to_test)
-    # print(response)
+    msg_to_test = "Do you like beatsaber?"
+    response = await test_bot.send_msg(msg_to_test)
+    print(response)
     # test_bot.chat_history.pop()
     # test_bot.chat_history.pop()
     # print("==============================================================")
@@ -474,8 +458,8 @@ async def testing_main():
     # test_bot.chat_history.pop()
     # print("==============================================================")
 
-    test_bot.scan_audio_devices() # returns all
-    test_bot.scan_audio_devices(device_to_find = "CABLE-A Input (VB-Audio Cable A") # returns that specific one
+    # test_bot.scan_audio_devices() # returns all
+    # test_bot.scan_audio_devices(device_to_find = "CABLE-A Input (VB-Audio Cable A") # returns that specific one
 
     # se_path, se_duration = test_bot.create_se_voice("Brian", "This is a test?")
     # await asyncio.sleep(1)

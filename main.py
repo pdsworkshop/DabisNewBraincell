@@ -1,14 +1,15 @@
-from dotenv import load_dotenv
 import asyncio
 import multiprocessing
 import time
-import twitch_connector
 import twitch_event
-import follow_websocketsender
 import discord_bot
-import app 
+import app
+from dotenv import load_dotenv
 
-import random
+# Acronyms:
+# TTT = Text To Text. LLM text transformation, text in, text out.
+# TTS = Text To Speech. Text in, Audio out.
+# STT = Speech To Text. Audio in, Text out.
 
 # Historical test/example
 def print_test(queue):
@@ -22,8 +23,8 @@ def print_test(queue):
 async def main():
     try:
         ### QUEUES ###
-        twitch_queue = multiprocessing.Queue()
-        discord_queue = multiprocessing.Queue()
+        twitch_queue = multiprocessing.Queue() # Messages to process for TTT before passing to TTS
+        discord_queue = multiprocessing.Queue() # Messages to TTS
 
         ### INGESTORS ###
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
@@ -37,17 +38,15 @@ async def main():
         app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,discord_queue,))
         app_process.start()
 
-        # follow_sender = multiprocessing.Process(target=follow_websocketsender.pre_main, args=(follow_queue,))
-        # follow_sender.start()
     except KeyboardInterrupt as kb_interrupt:
         print(f"[!] Keyboard interrupt.\n{kb_interrupt}")
         event_process.join()
         event_process.terminate()
         event_process.close()
         
-        # discord_process.join()
-        # discord_process.terminate()
-        # discord_process.close()
+        discord_process.join()
+        discord_process.terminate()
+        discord_process.close()
         
         app_process.join()
         app_process.terminate()

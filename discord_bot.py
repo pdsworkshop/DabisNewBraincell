@@ -1,10 +1,8 @@
 # https://guide.pycord.dev/voice/receiving
-import io
 import discord
 import os
 import json
-from discord.ext import commands
-import speech_recognition as sr
+# from discord.ext import commands
 from dotenv import load_dotenv
 import tbone_transcriber
 import asyncio
@@ -22,6 +20,7 @@ time_to_listen = 10
 
 global_twitch_queue = None
 global_discord_queue = None
+global_comminicating = False
 
 @bot.event
 async def on_ready():
@@ -112,14 +111,36 @@ async def record(ctx: discord.ApplicationContext):  # If you're using commands.B
 
 @bot.slash_command()
 async def update_time(ctx: discord.ApplicationContext, new_time: int = discord.Option(description="Enter the new time in seconds", min=1, max=999)):
+    global time_to_listen
     time_to_listen = new_time
     await ctx.respond(f"Updated time to {time_to_listen}")
 
 @bot.slash_command()
+async def stop_communicate(ctx: discord.ApplicationContext, stop: int = discord.Option(description="Should Dabi Stop?", min=0, max=1)):
+    global global_comminicating
+    await ctx.respond(f"{stop=}")
+    if stop == 1:
+        global_comminicating = True
+        await ctx.respond(f"Dabi is non-stop")
+    if stop == 0:
+        global_comminicating = False
+        await ctx.respond(f"Dabi is now stop")
+
+@bot.slash_command()
 async def communicate(ctx: discord.ApplicationContext):
+    global global_comminicating
+    voice = ctx.author.voice
+    if not voice:
+        return await ctx.respond("You aren't in a voice channel!")
+    if not ctx.voice_client:
+        vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
+    else:
+        vc = ctx.voice_client
+    connections.update({ctx.guild.id: vc})  # Updating the cache with the guild and channel.
     await ctx.respond("Time for some chatting!")
     try:
-        while True:
+        global_comminicating = True
+        while global_comminicating:
             await record(ctx)
             await asyncio.sleep(time_to_listen)
             await asyncio.sleep(0.1)
@@ -127,7 +148,6 @@ async def communicate(ctx: discord.ApplicationContext):
         print(f"Somebody tell George there has been an error in my braincell: {e}")
         # TODO add a way for Dabi to scream that. Either once or loop it.
 
-# @bot.command()
 async def stop_recording(ctx: discord.ApplicationContext):
     if ctx.guild.id in connections:  # Check if the guild is in the cache.
         vc = connections[ctx.guild.id]
@@ -178,6 +198,9 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
         # Don't need to hard code the things, can make it load from file for Discord ID/Name Key/Value pairs.
         global_twitch_queue.put(json.dumps(to_send))
         
+    # Attempts to access transcription, even if nobody says anything.
+    # Additionally, need to update this as a whole for when multiple people are talking or able to talk.
+    # Potential option: Combine to one single message?
     await channel.send(f"Transcription for this message:\n\n{transcription["msg_msg"]}")  # Send a message with the transcription.
 
 def start_bot(twitch_queue, discord_queue):
@@ -191,7 +214,8 @@ if __name__ == "__main__":
     # To run the bot quickly
     import multiprocessing
     twitch_queue = multiprocessing.Queue()
-    start_bot(twitch_queue)
+    discord_queue = multiprocessing.Queue()
+    start_bot(twitch_queue, discord_queue)
 
     # For whatever we want to test.
     # asyncio.run(test())
