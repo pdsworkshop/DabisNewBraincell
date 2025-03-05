@@ -6,6 +6,11 @@ import discord_bot
 import app
 from dotenv import load_dotenv
 
+# Acronyms:
+# TTT = Text To Text. LLM text transformation, text in, text out.
+# TTS = Text To Speech. Text in, Audio out.
+# STT = Speech To Text. Audio in, Text out.
+
 # Historical test/example
 def print_test(queue):
     while True:
@@ -18,8 +23,8 @@ def print_test(queue):
 async def main():
     try:
         ### QUEUES ###
-        twitch_queue = multiprocessing.Queue()
-        discord_queue = multiprocessing.Queue()
+        twitch_queue = multiprocessing.Queue() # Messages to process for TTT before passing to TTS
+        discord_queue = multiprocessing.Queue() # Messages to TTS
 
         ### INGESTORS ###
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
